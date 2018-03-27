@@ -1,4 +1,6 @@
 import numpy as np
+from sklearn.cluster import KMeans
+import math
 
 ####################################################################
 ######################## ISSUES START ##############################
@@ -472,14 +474,22 @@ def set_stacking_periods(stacking):
 
     return pera, perb, perc
 
+
+#add check for which direction need reducing
 def convert_to_com(array):
     """
     return an array which has converted a vector of points into a new vector of less points based on mean ring_positions
+    Does this using KMeans algorithm from sklearn
     e.g. ||  ||  ||  ||   -> |  |  |  |  etc
     """
-
+    cluster_number = math.ceil(array.shape/2)
+    kmeans = Kmeans(n_clusters = cluster_number,  random_state=0).fit(array)) #the number of clusters here is half
+    #the no. atoms along the length dimension
+    converted = kmeans.cluster_centers_ #runs kmeans and gets the centers
 
     return converted
+
+
 
 def find_ring_centres(array, site, add_on_ends = True):
     """
