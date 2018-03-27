@@ -338,6 +338,7 @@ def build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim,
     # turn the numpy arrays for unit cell and positions into strings
     unit_cell_string='\n\t\t'.join(spaces.join('%0.10f' %x for x in y) for y in unit_cell)
     cartesian_string='\n\t'.join(spaces.join('%0.10f' %x for x in y) for y in atoms)
+
     #if intercalant atom array is not empty then turn into a string, otherwise set to blank
     if intercalant_atom_positions.size:
         intercalant_atom_string = '\n\t'.join(spaces.join('%0.10f' %x for x in y) for y in intercalant_atom_positions)
@@ -399,7 +400,9 @@ def ribbon_maker(atoms, spacer, a, c, xw=1, zw=1):
 
     # add atoms positions to the permutations shifted by the unit cell
     unit_cell_shifts = combine(base, array_builder(a, 0, c)) # multiply the unit cell shifts by unit cell sizes
+
     atoms = adder(atoms, unit_cell_shifts) # add the shifts in cell positions
+
 
     # edit current edge so that the ribbons are spatially symmetric
     atoms, distance_chopped, no_deleted = edge_modifier(atoms, xw, zw, 'zz', 2)  # two z position atoms to delete on edge
@@ -469,9 +472,51 @@ def set_stacking_periods(stacking):
 
     return pera, perb, perc
 
-def intercalate(atoms, layers, intercalant_atom, stacking='AB', xwidth=1, zwidth=1):
+def find_ring_centres(array, site, add_on_ends = True):
+    """
+    returns an array with the positions of all ring sites specified, e.g. find all ring centres
+    takes in an array of projected atom positions in 2d
+    """
 
-    ygap
+    x_edge1, x_edge2 = np.amin(array[:,0]), np.amax(array[:,0])
+    y_edge1, y_edge2 = np.amin(array[:,1]), np.amax(array[:,1])
+
+
+
+
+
+    return ring_positions
+
+def intercalate(atoms, layers, site, xwidth=1, zwidth=1):
+    """
+    finds the bottom of the layers, then iterates up and finds the sites to put alkali metal atoms into
+    returns a np array with all atom positions, the end ones of which are the alkali metal positions
+    """
+    tol = 0.1 # tolerance for isclose
+
+    for n in range(layers): # iterate over all atoms
+        temp_atoms = numpy.copy(atoms)
+        lower_atom_plane = np.amin(temp_atoms[:,1]) # number which is y height in cell
+        temp_atoms = np.isclose(temp_atoms[:,1], lower_atom_plane, tol) #delete lowest plane so you can get second lowest
+        upper_atom_plane = np.amin(temp_atoms[:,1])
+
+        half_plane_thickness = (upper_atom_plane - lower_atom_plane)/2
+        plane_centre = half_plane_thickness + lower_atom_plane
+        temp_atoms = np.isclose(temp_atoms[:,1], lower_atom_plane, tol) #delete lowest plane so you can get second lowest
+
+        second_lower_plane = np.amin(temp_atoms[:,1])
+        nth_gap = second_lower_plane - upper_atom_plane
+
+        y_value_for_int_atoms = upper_atom_plane + nth_gap/2 # put halfway between layers
+
+        temp_atoms = numpy.copy(atoms)
+        mask = np.isclose(atoms[:,1],plane_centre, half_plane_thickness + tol) # make a vector of ones and zeros for rows corresponding to the layer of interest
+        twod_plane_monolayer_atoms = atoms[mask]
+        twod_plane_monolayer_atoms = twod_plane_monolayer_atoms[:, [0,2]] # select the a and b axes
+
+        ring_positions = find_ring_centres(twod_plane_monolayer_atoms, site)
+
+
 
     return atoms
 
@@ -488,7 +533,8 @@ def intercalate(atoms, layers, intercalant_atom, stacking='AB', xwidth=1, zwidth
 
 ln = 5
 xw = 1
-zw = 1
+zw = 3
+print('Layer number: '+str(ln)+'. Width of zz ribbon: '+str(zw))
 
 assert type(ln) == int, 'please insert an integer number of layers'
 assert ln > 0, 'please insert a positive number of layers'
@@ -563,10 +609,10 @@ def edit_cell():
     combo_rib_dim = xw * zw  # number of permutations of unit cells
 
     # create intercalation atom cell
-    intercalant_atom_positions = intercalate(atoms, layers, intercalant_atom, stacking='AB', xwidth=1, zwidth=1)
+    #intercalant_atom_positions = intercalate(atoms, layers, intercalant_atom, stacking='AB', xwidth=1, zwidth=1)
 
     # create poscar string for the given inputs
-    poscar_string = build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim, no_deleted, intercalant_atom, intercalant_atom_no, intercalant_atom_positions)
+    poscar_string = build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim, no_deleted) #, intercalant_atom, intercalant_atom_no, intercalant_atom_positions)
 
     # write the poscar to file with filename
     write_to_file = write_poscar(poscar_string, filename)
@@ -580,6 +626,3 @@ edit_cell()
 ####################################################################
 ######################### CALL FUNCS END ###########################
 ####################################################################
-
-
-
