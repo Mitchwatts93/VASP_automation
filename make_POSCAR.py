@@ -472,6 +472,15 @@ def set_stacking_periods(stacking):
 
     return pera, perb, perc
 
+def convert_to_com(array):
+    """
+    return an array which has converted a vector of points into a new vector of less points based on mean ring_positions
+    e.g. ||  ||  ||  ||   -> |  |  |  |  etc
+    """
+
+
+    return converted
+
 def find_ring_centres(array, site, add_on_ends = True):
     """
     returns an array with the positions of all ring sites specified, e.g. find all ring centres
@@ -480,6 +489,10 @@ def find_ring_centres(array, site, add_on_ends = True):
 
     x_edge1, x_edge2 = np.amin(array[:,0]), np.amax(array[:,0])
     y_edge1, y_edge2 = np.amin(array[:,1]), np.amax(array[:,1])
+
+
+    l_planes = np.unique(array[:,1]) # unique values in z direction. i.e. the sites to interate over
+
 
 
 
