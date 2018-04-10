@@ -1,0 +1,39 @@
+
+##########################################################################################
+# to do
+##########################################################################################
+# - add docstrings and doctests
+##########################################################################################
+##########################################################################################
+##########################################################################################
+
+
+##########################################################################################
+##########################################################################################
+#Format of conv_params file
+##########################################################################################
+##########################################################################################
+
+# Ensure that INCAR has ENCUT in it, and KPOINTS has Gamma in it, just before where KPOINTS should be added.
+
+#note that this file should be names conv_params and be located in your INPUT folder
+#Your INPUT folder should contian all files you wish to copy. This script will make directories as specified by
+# the format below, it will edit releavnt files but won't touch others, e.g. your job files won't be edited
+
+#E_low_range E_multiple E_higg_range    e.g. 200 50 300 will make 200, 250 and 300 values
+#list of space separated kpoints which are dash delimited. e.g. 4-4-4 3-3-3 2-2-2
+#default energy cutoff as a number
+#default Kpts as k-k-k
+
+##########################################################################################
+##########################################################################################
+
+# note on subprocess. This may not be implemented well. Have not fully read documentation.
+# using shell = True can be a security hazard due to shell injection esp if command string is constructed from external
+# input (not really an issue here but not used for good practice)
+
+# further note: uisng pipe to capture output may cause issues if pipe buffer is filled, in which case it will cause the program to hang.
+# remove stderr/stdout from subprocess calls if this happens - this will cause bash outputs to be seen during running and will not allow details to be saved to log
+
+# documentation suggests using Popen with communicate() method when pipes are needed -> this seems to be after already using pipe
+# e.g. a.communicate() is the same as a.stderr.read(). not sure if this will cause an issue though...
