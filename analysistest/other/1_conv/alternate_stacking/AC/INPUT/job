@@ -1,0 +1,14 @@
+#!/bin/bash -l
+#$ -S /bin/bash
+#$ -l h_rt=1:00:00
+# -l mem=1G
+#$ -N BP_3_layer_conv_AC
+#$ -pe qlc 32
+#$ -cwd
+#$ -o q.output
+#$ -e q.error
+
+ulimit -s unlimited
+ulimit -m unlimited
+
+gerun ${HOME}/bin/vasp_std > vasp_out

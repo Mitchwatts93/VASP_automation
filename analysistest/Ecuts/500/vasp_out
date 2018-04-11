@@ -1,0 +1,77 @@
+
+Using environment: intel
+Running on 32 slots:
+   32 MPI tasks
+    1 threads per task
+TMPDIR=/tmpdir/job/247971.undefined
+
+Contents of machinefile:
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-281
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+node-r99a-106
+
+ running on   32 total cores
+ distrk:  each k-point on   32 cores,    1 groups
+ distr:  one band on    8 cores,    4 groups
+ using from now: INCAR     
+ vasp.5.4.4.18Apr17-6-g9f103f2a35 (build Jun 20 2017 18:00:50) complex          
+  
+ POSCAR found type information on POSCAR  P 
+ POSCAR found :  1 types and      12 ions
+ scaLAPACK will be used
+ LDA part: xc-table for Pade appr. of Perdew
+ POSCAR, INCAR and KPOINTS ok, starting setup
+ FFT: planning ...
+ WAVECAR not read
+ WARNING: random wavefunctions but no delay for mixing, default for NELMDL
+ entering main loop
+       N       E                     dE             d eps       ncg     rms          rms(c)
+DAV:   1     0.377562057553E+03    0.37756E+03   -0.21592E+04   960   0.113E+03
+DAV:   2    -0.222546763175E+02   -0.39982E+03   -0.38819E+03  1368   0.218E+02
+DAV:   3    -0.632770760093E+02   -0.41022E+02   -0.40513E+02  1128   0.721E+01
+DAV:   4    -0.647691336368E+02   -0.14921E+01   -0.14815E+01  1416   0.154E+01
+DAV:   5    -0.648123768314E+02   -0.43243E-01   -0.43213E-01  1480   0.246E+00    0.175E+01
+DAV:   6    -0.644876538664E+02    0.32472E+00   -0.19899E-01  1248   0.164E+00    0.104E+01
+DAV:   7    -0.643387743206E+02    0.14888E+00   -0.36107E-01  1184   0.227E+00    0.435E-01
+DAV:   8    -0.643385019386E+02    0.27238E-03   -0.31997E-02  1256   0.728E-01    0.232E-01
+DAV:   9    -0.643384645472E+02    0.37391E-04   -0.17306E-03  1408   0.171E-01    0.194E-01
+DAV:  10    -0.643382110111E+02    0.25354E-03   -0.39287E-04  1216   0.772E-02    0.147E-01
+DAV:  11    -0.643379623378E+02    0.24867E-03   -0.38845E-04  1208   0.739E-02    0.435E-02
+DAV:  12    -0.643380629102E+02   -0.10057E-03   -0.65974E-05  1208   0.315E-02    0.154E-02
+DAV:  13    -0.643382914420E+02   -0.22853E-03   -0.78410E-05  1072   0.326E-02    0.350E-02
+DAV:  14    -0.643384229934E+02   -0.13155E-03   -0.20664E-05   984   0.164E-02    0.315E-02
+DAV:  15    -0.643384449356E+02   -0.21942E-04   -0.18685E-06   752   0.623E-03    0.253E-02
+DAV:  16    -0.643386800741E+02   -0.23514E-03   -0.22298E-05   960   0.155E-02    0.210E-02
+DAV:  17    -0.643387016412E+02   -0.21567E-04   -0.29370E-06   832   0.652E-03    0.165E-02
+DAV:  18    -0.643387016777E+02   -0.36457E-07   -0.34791E-07   768   0.252E-03
+   1 F= -.66512641E+02 E0= -.66512641E+02  d E =-.675263E-07
+ writing wavefunctions
