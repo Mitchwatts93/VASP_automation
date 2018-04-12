@@ -1,0 +1,19 @@
+Date: 2018-04-12
+Time: 17:55:10
+Working Directory: /mnt/c/Users/mcwatts/Documents/PhD/VASP/automation/analysistest
+default E: 0
+default Kpts: ['4', '5', '6']
+
+file trees: 
+[['E_cutoff/fly', ['444'], ['555'], ['666']], ['']]
+
+NOTE: the format of these logs is not great, if there are no obvious messages then everything is okay
+
+logs from making directories: 
+{'E_cutoff/fly sub directories': {'666': (b'', b'mkdir: cannot create directory \xe2\x80\x98E_cutoff/fly/6-6-6\xe2\x80\x99: File exists\n'), '444': (b'', b'mkdir: cannot create directory \xe2\x80\x98E_cutoff/fly/4-4-4\xe2\x80\x99: File exists\n'), '555': (b'', b'mkdir: cannot create directory \xe2\x80\x98E_cutoff/fly/5-5-5\xe2\x80\x99: File exists\n')}, 'E_cutoff/fly made output': (b'', b'mkdir: cannot create directory \xe2\x80\x98E_cutoff/fly\xe2\x80\x99: File exists\n')}
+
+logs from adding files: 
+{'E_cutoff/fly copied successfully': {'666': (b'', b''), '444': (b'', b''), '555': (b'', b'')}, 'removed conv_params from all?': {'666': (b'', b''), '444': (b'', b''), '555': (b'', b'')}}
+
+logs from editing files: 
+{'E_cutoff/fly': 'editing', 'E_cutoff/fly instances': {'666': 'Success', '444': 'Success', '555': 'Success'}}

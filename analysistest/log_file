@@ -1,5 +1,5 @@
 Date: 2018-04-11
-Time: 16:47:42
+Time: 18:23:03
 Working Directory: /mnt/c/Users/mcwatts/Documents/PhD/VASP/automation/analysistest
 default E: ['800']
 default Kpts: ['17', '1', '1']
@@ -10,10 +10,10 @@ file trees:
 NOTE: the format of these logs is not great, if there are no obvious messages then everything is okay
 
 logs from making directories: 
-{'Kpts made output': (b'', b''), 'Kpts sub directories': {'3-1-1': (b'', b''), '7-1-1': (b'', b''), '5-1-1': (b'', b''), '6-1-1': (b'', b''), '4-1-1': (b'', b''), '10-1-1': (b'', b'')}, 'E_cutoff made output': (b'', b''), 'E_cutoff sub directories': {'1000': (b'', b''), '950': (b'', b''), '850': (b'', b''), '700': (b'', b''), '600': (b'', b''), '750': (b'', b''), '900': (b'', b''), '800': (b'', b''), '550': (b'', b''), '500': (b'', b''), '650': (b'', b'')}}
+{'Kpts made output': (b'', b''), 'Kpts sub directories': {'3-1-1': (b'', b''), '5-1-1': (b'', b''), '7-1-1': (b'', b''), '10-1-1': (b'', b''), '4-1-1': (b'', b''), '6-1-1': (b'', b'')}, 'E_cutoff sub directories': {'850': (b'', b''), '950': (b'', b''), '500': (b'', b''), '750': (b'', b''), '650': (b'', b''), '700': (b'', b''), '800': (b'', b''), '900': (b'', b''), '550': (b'', b''), '1000': (b'', b''), '600': (b'', b'')}, 'E_cutoff made output': (b'', b'')}
 
 logs from adding files: 
-{'E_cutoff copied successfully': {'1000': (b'', b''), '950': (b'', b''), '850': (b'', b''), '700': (b'', b''), '600': (b'', b''), '750': (b'', b''), '900': (b'', b''), '800': (b'', b''), '550': (b'', b''), '500': (b'', b''), '650': (b'', b'')}, 'Kpts copied successfully': {'3-1-1': (b'', b''), '7-1-1': (b'', b''), '5-1-1': (b'', b''), '6-1-1': (b'', b''), '4-1-1': (b'', b''), '10-1-1': (b'', b'')}, 'removed conv_params from all?': {'3-1-1': (b'', b''), '7-1-1': (b'', b''), '5-1-1': (b'', b''), '6-1-1': (b'', b''), '4-1-1': (b'', b''), '10-1-1': (b'', b'')}}
+{'removed conv_params from all?': {'3-1-1': (b'', b''), '5-1-1': (b'', b''), '7-1-1': (b'', b''), '10-1-1': (b'', b''), '4-1-1': (b'', b''), '6-1-1': (b'', b'')}, 'Kpts copied successfully': {'3-1-1': (b'', b''), '5-1-1': (b'', b''), '7-1-1': (b'', b''), '10-1-1': (b'', b''), '4-1-1': (b'', b''), '6-1-1': (b'', b'')}, 'E_cutoff copied successfully': {'850': (b'', b''), '950': (b'', b''), '500': (b'', b''), '750': (b'', b''), '650': (b'', b''), '700': (b'', b''), '800': (b'', b''), '900': (b'', b''), '550': (b'', b''), '1000': (b'', b''), '600': (b'', b'')}}
 
 logs from editing files: 
-{'Kpts': 'editing', 'Kpts instances': {'3-1-1': 'Success', '7-1-1': 'Success', '5-1-1': 'Success', '6-1-1': 'Success', '4-1-1': 'Success', '10-1-1': 'Success'}, 'E_cutoff instances': {'1000': 'Success', '950': 'Success', '850': 'Success', '700': 'Success', '600': 'Success', '750': 'Success', '900': 'Success', '800': 'Success', '550': 'Success', '500': 'Success', '650': 'Success'}, 'E_cutoff': 'editing'}
+{'E_cutoff instances': {'850': 'Success', '950': 'Success', '500': 'Success', '750': 'Success', '650': 'Success', '700': 'Success', '800': 'Success', '900': 'Success', '550': 'Success', '1000': 'Success', '600': 'Success'}, 'Kpts': 'editing', 'E_cutoff': 'editing', 'Kpts instances': {'3-1-1': 'Success', '5-1-1': 'Success', '7-1-1': 'Success', '10-1-1': 'Success', '4-1-1': 'Success', '6-1-1': 'Success'}}

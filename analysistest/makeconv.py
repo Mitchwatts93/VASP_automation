@@ -20,8 +20,9 @@ import argparse
 # to do
 ##########################################################################################
 # - add docstrings and doctests
-# - add more info to the output
-# add functionality for creating kpoints or Ecuts on the fly
+# - clean it up and add some abstraction barriers
+# - add more info to the output of analysis document e.g. run time and scf steps
+# - swap trees to class implementation
 ###########################################################################################
 ##########################################################################################
 ##########################################################################################
@@ -238,12 +239,13 @@ class FileMaker:
 
         self.edit_files[param_label] = 'editing'
         status = []
-        if param_label == 'Kpts':
+        if 'Kpts' in param_label:
             for i in branches(tree):
                 edit_kpts(param_label, i[0], i) # edit kpts file
+                print(e_def)
                 edit_incar(param_label, e_def, i) # edit incar file
                 status.append('Success')
-        elif param_label =='E_cutoff':
+        elif 'E_cutoff' in param_label:
             for i in branches(tree):
                 edit_incar(param_label, i[0], i) # edit incar file
                 edit_kpts(param_label, k_def, i) # edit kpts file
@@ -271,7 +273,7 @@ class FileMaker:
 
 class log_file:
 
-    def __init__(self, settings, filemaker):
+    def __init__(self, settings, filemaker, title = 'log_file'):
         self.date = datetime.datetime.now().strftime("%Y-%m-%d")
         self.time = datetime.datetime.now().time().strftime("%H:%M:%S")
         self.cwd = os.getcwd() # of the script!
@@ -282,10 +284,11 @@ class log_file:
         self.made_dirs = filemaker.made_parents
         self.added_files = filemaker.added_files
         self.edited_files = filemaker.edit_files
+        self.title = title
 
 
     def create_log(self):
-        path = self.cwd + '/' + 'log_file'
+        path = self.cwd + '/' + self.title
         lines = ["Date: " + self.date, "Time: " + self.time, "Working Directory: " + self.cwd, "default E: " + str(self.def_e), "default Kpts: " + str(self.def_k) ,"","file trees: ", str(self.trees),
                  "","NOTE: the format of these logs is not great, if there are no obvious messages then everything is okay","","logs from making directories: ", str(self.made_dirs), "","logs from adding files: ", str(self.added_files), "",
                  "logs from editing files: ", str(self.edited_files)]  # make lines
@@ -471,7 +474,7 @@ class WriteCSVFile:
             e_tuples[i+1] = (e_tuples[i+1][0], e_tuples[i+1][1], e_tuples[i+1][1] - e_tuples[i][1])
         with open(path, 'a') as f:
             w = csv.writer(f)
-            w.writerow(['cutoff energy', 'energy (eV)', 'difference (eV)'])
+            w.writerow(['cutoff energy', ' energy (eV)', ' difference (eV)'])
             for row in e_tuples:
                 w.writerow(row)
 
@@ -483,7 +486,7 @@ class WriteCSVFile:
 
 
         # write kpts to csv
-        k_tuples = [(i, j) for i,j in self.energies[self.k_name].items()]
+        k_tuples = [(i, j) for i, j in self.energies[self.k_name].items()]
         k_tuples = sorted(k_tuples, key=lambda x: (int(x[0][0]), int(x[0][2]), int(x[0][4:]))) # sort them by the kpoints
         for i in range(len(k_tuples)-1):
             k_tuples[i+1] = (k_tuples[i+1][0], k_tuples[i+1][1], k_tuples[i+1][1] - k_tuples[i][1])
@@ -553,6 +556,79 @@ def analyse_conv_files():
     # this has details and list of energies and energy differences by sorted values
     written.add_POSCAR() # copies the poscar from input into this folder
 
+
+def on_the_fly():
+
+    create_or_edit = input("please enter either 'c' or 'e' to choose whether to create new directories on the fly, "
+                           "or to edit all instances of a file in subdirectories of current directory. \n")
+    if create_or_edit == 'e':
+        print("Have only implemented create right now, sorry.")
+        return False
+
+    # create instructions
+    k_or_e = input("Please enter either 'k' or 'e' to choose which convergence directories you would like to make: "
+                   "a set of kpoints directories or a set of energy directories.\n")
+
+    # read in the kpoints or energies to create
+    if k_or_e =='k':
+        kpts = input("please enter the kpoints you would like to create, in the format x-y-z,i-j-k, etc. i.e. comma "
+                     "seperated the directories to create, and dash seperate the numbers. \n")
+        def_e = [input("please enter the default energy you would like to run at, leave blank to get this from"
+                      "the input folder \n")]
+
+        kpts =  [i.split('-') for i in kpts.split(',')] # split kpoints into a list of lists of elements
+
+        choices = Settings([], kpts, def_e, '0-0-0') # pass in the defaults for what you want to make
+        k_tree = choices.make_file_tree()[1] # the ktree is the 1st element in the list returned
+        k_tree[0] += '/fly' # put into a subdirectory fly for ease of running
+        files = FileMaker(choices, tree(''), k_tree) # make the object for creating everything
+
+        files.dir_maker(k_tree) # make the directories
+
+        files.file_adder(files.k_tree) # add the default files from INPUT
+
+        files.file_editor(k_tree) # edit the files according to the user inputs
+
+        date = datetime.datetime.now().strftime("%Y_%m_%d")
+        time = datetime.datetime.now().time().strftime("%H_%M_%S")
+        log = log_file(choices, files, 'on_the_fly' + date + "_" + time)
+        log.create_log() # create log file with date and time
+
+
+    # if they want to make some energies do this
+    elif k_or_e =='e':
+        energies = input("please enter the energies you would like to create, in the format xyz,ijk, etc. i.e. comma "
+                     "seperated directories to create\n")
+        def_k = input("please enter the default kpoints you would like to run at, format: x-y-z"
+                      "leave blank to get this from the alphabetically first subdirectory here\n")
+
+        energies = energies.split(',') # split the input on commas
+        energies = [[i] for i in energies] # make sure the energies are themselves lists for objects to work properly
+        def_k = def_k.split('-') #split the kpoints into a list of elements
+
+        choices = Settings(energies, [], '0', def_k) # pass in the defaults for what you want to make
+        e_tree = choices.make_file_tree()[0] # the etree is the 0th element in the list returned
+        e_tree[0] += '/fly' # put into a subdirectory fly for ease of running
+        files = FileMaker(choices, e_tree, tree('')) # make the object for creating everything
+
+        files.dir_maker(e_tree) # make the directories
+
+        files.file_adder(files.e_tree) # add the default files from INPUT
+
+        files.file_editor(e_tree) # edit the files according to the user inputs
+
+        date = datetime.datetime.now().strftime("%Y_%m_%d")
+        time = datetime.datetime.now().time().strftime("%H_%M_%S")
+        log = log_file(choices, files, 'on_the_fly' + date + "_" + time)  # create log file
+        log.create_log() # create log file with date and time
+
+    # if neither k or e was entered
+    else:
+        print('You entered the wrong input!!')
+        return False
+
+    return False
+
 ##########################################################################################
 ##########################################################################################
 
@@ -564,10 +640,16 @@ parser = argparse.ArgumentParser(description = 'Make or analyse convergence docs
 parser.add_argument('-f', '--function', help = 'Enter m for making files, a for analysing files', required = True)
 args = vars(parser.parse_args())
 
+print("please note this program is not fully tested and may contain bugs. I advise reading the readme and checking "
+      "all files before running \n")
+
 if args['function'] == 'm':
     make_conv_files()
 elif args['function'] == 'a':
     analyse_conv_files()
+elif args['function'] == 'fly':
+    print('On the fly functionality not fully implemented yet! \n')
+    on_the_fly()
 else:
     print('enter either m or a to run the program. m will make files, a will analyse them')
 
