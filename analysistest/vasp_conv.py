@@ -73,96 +73,189 @@ import argparse         # used for cmd line input
 # abstraction functions
 ##########################################################################################
 
-def file_reader(filename):
-    """
+# This can all be put into a class, maybe comnbined with the current class for analysis reading files
 
+def file_reader(filename = 'conv_params'):
+    """
+    Reads a conv_params.txt file parameters and returns them as a list.
+
+
+    Args:
+        filename: a string object which is the name of the file with settings in it. 'INPUT/conv_params' by default
+
+    Returns:
+          a list of settings, each element is a line in file:
+            0: the energies which will be tested as strings. first is lower energy bound, second is the step size
+                third is the upper range, e.g. [['450'],['50'],['600']]
+            1: the kpoints to be tested as a list, each part of the string is an element in a sublist. e.g.
+                [['7','1','1'],['8','1','1']].
+            2: the default energy as a string e.g. ['400']
+            3: the default kpoints as a list e.g. ['7','1','1']
+
+    Raises:
+        Currently nothing.
+
+    To do:
+        Add checks for format and raise errors here if structure is incorrect:
+            - first line must be three space seperated numbers (integers?)
+            - second line must be any amount of space seperated dash delimited kpoints
+            - a single number
+            - a single set of dash delimited kpoints
     """
 
     with open(filename) as f:
         info = f.readlines()
     info = [i.strip() for i in info] # each element in info is a string of a line from the file
-    info = [i.split() for i in info] #split each whitespace delimited element into a list of lists
+    info = [i.split() for i in info] # split each whitespace delimited element into a list of lists
     info = [[i.split('-') for i in j] for j in info] # note info is 3 layers deep
 
-    #info[0] = [i[0] for i in info[0]] #removes some of the nested structure. now its just a
-    info[2] = info[2][0] #makes default E just a number
+    info[2] = info[2][0] # makes default E just a single string of the number
     info[3] = info[3][0]
 
     return info
 
-def edit_kpts(param_label, i, dir):
+
+def edit_kpts(param_label, i, dir, line_key = 'Gamma', file = 'KPOINTS'):
+    """
+    Edits a KPOINTS file to have kpoints equal to those passed in.
+
+    Args:
+        param_label: the name of the parent directory as a string. e.g. 'Kpts'
+        i: a list of kpoints of length 3 where each element is a kpoint to be written
+        dir: the name of the parent directory, currently equal to the kpoints to be written e.g. '7-1-1'
+
+    Returns:
+        False: using this convention as when add assertion errors then it will return a value -> True if anything goes
+            wrong
+
+    Raises:
+        Currently nothing
+
+    To do:
+        Assertion errors. Note currently this only works if 'Gamma' is in the kpoints file, and the kpoints to be edited
+            are directly below this. Note this will currently work if you have 'Gamma' commented out above the kpoints
+            to be edited so its not an issue.
+        Can probably get rid of dir argument as you can generate it by: i.join('-'), but allows flexibility elsewhere?
     """
 
-    """
-
-    line_key = 'Gamma'
-    #line_no = 3
-    file = 'KPOINTS'
     replacement_line = "  " + i[0] + "  " + i[1] + "  " + i[2]
     gen_file_editor(param_label, dir, file, replacement_line, line_key)
+
     return False
 
-def edit_incar(param_label, i, dir):
+
+def edit_incar(param_label, i, dir, line_key = 'ENCUT', file = 'INCAR'):
     """
+    Edits an INCAR file according to inputs to have the correct ENCUT.
+
+    Args:
+        param_label: the name of the parent directory as a string. e.g. 'E_cutoff'
+        i: a list of lists of energies length 1, e.g. [['400'],['500']]
+        dir: the name of the parent directory, currently equal to the energy to be written e.g. '400'
+
+    Returns:
+        False: using this convention as when add assertion errors then it will return a value -> True if anything goes
+            wrong
+
+    Raises:
+        Currently nothing
+
+    To do:
+        Assertion errors. Note currently this only works if 'Gamma' is in the kpoints file, and the kpoints to be edited
+            are directly below this. Note this will currently work if you have 'Gamma' commented out above the kpoints
+            to be edited so its not an issue.
+        Can probably get rid of dir argument as you can generate it by: i.join('-'), but allows flexibility elsewhere?
 
     """
 
-    line_key = 'ENCUT'
-    #line_no = 18
-    file = 'INCAR'
     replacement_line = "  ENCUT   = " + i[0] + "       ! Plane-wave cutoff"
     gen_file_editor(param_label, dir, file, replacement_line, line_key)
+
     return False
+
 
 def gen_file_editor(param_label, i, file, replacement_line, line_key):
     """
+    A general file editor that uses inputs passed from either the edit_kpts or edit_incar functions.
 
+    Args:
+        param_label: the name of the parent directory as a string. e.g. 'E_cutoff'
+        i: the name of the parent directory, currently equal to the thing to be written e.g '400' or '7-7-1'
+        file: the name of the file to edit e.g. 'KPOINTS' or 'INCAR'
+        replacement_line: the line to be inserted
+        line_key: the key for where to input the replacement line. This should be changed to be a line no. and the
+            key used in either edit_kpts or edit_incar decides the number...
+
+
+    Returns:
+        False: using this convention as when add assertion errors then it will return a value -> True if anything goes
+            wrong
+
+    Raises:
+        Currently nothing
+
+    To do:
+        by this point everything passed in should have been checked by previous functions. If it hasn't been passed in
+            you may have issues so do a check on that somehow with some dummy argument? Then if it is called from
+            somewhere else do checks on the format of everything passed in.
     """
 
     file = param_label + '/' + "-".join(root(i)) + '/' + file  # path to file
-    lines = open(file).read().splitlines()  # read lines into elements in a list
+    lines = open(file).read().splitlines()  # read lines into elements in a list where each element is a new line in the
+        # file
 
+    # this could be moved into another function?
+    # find where to replace the line based on what we are finding.
     line_no = False
-
     for i in lines:
         if line_key in i:
             line_no = lines.index(i)
 
-
+    # if the line key isn't there
     if not line_no:
-        return 'Line key not found in files. Ensure that INCAR has ENCUT in it, and KPOINTS has Gamma in it, just before where KPOINTS should be added'
+        return 'Line key not found in files. Ensure that INCAR has ENCUT in it, and KPOINTS has Gamma in it, just before' \
+               ' where KPOINTS should be added'
 
+    # for kpoints we find the 'Gamma' string and replace the line below with the kpoints we want to write
     if line_key == 'Gamma':
         line_no += 1
 
+    # replace the
     lines[line_no] = replacement_line  # replace the kpoints details in the list
     open(file, 'w').write('\n'.join(lines))  # write list to file
 
     return False
 
-def get_params(path):
-    """
 
+def get_params(path = 'INPUT/conv_params'):
+    """
+    A function which calls other functions in order to get the user parameters, clean them and make an object from them
+
+    Args:
+        path: path to the conv_params user settings. default is 'INPUT/conv_params'
+
+    Returns:
+        a Settings object with the settings of the users choosing
     """
 
     # cd to Input, read the conv_params file in and pass each line to file reader
     list = file_reader(path)
-    # return an object choices to be passed to settings
-    Ecuts =  list[0]
 
-    start = int(Ecuts[0][0])
-    multiplier = int(Ecuts[1][0])
-    end = int(Ecuts[2][0])
-    E_range = (end - start)//multiplier +1
+    Ecuts =  list[0] # first element returned from filereader is the energies
+    start = int(Ecuts[0][0]) # the first element of this is the lower energy to start from. convert to integer for maths
+    multiplier = int(Ecuts[1][0]) # middle element is the step size
+    end = int(Ecuts[2][0]) # last element is upper bound on energy
+    E_range = (end - start)//multiplier +1 # the number of energies you will create
+    Es = [i*multiplier for i in range(E_range)] # take steps in the E_range of step size multiplier
+    Ecuts = [[str(i+start)] for i in Es] # add the start energy to all these steps to shift them to correct energies
+                                            # convert the numbers to strings for ease of file writing later
 
-    Es = [i*multiplier for i in range(E_range)]
-    Ecuts = [[str(i+start)] for i in Es]
-    kpts = list[1]
-    def_E = list[2]
-    def_k = list[3]
-    params = Settings(Ecuts, kpts, def_E, def_k)
+    kpts = list[1] # kpoints list is first element returned
+    def_E = list[2] # default energy
+    def_k = list[3] # default kpoints
+    params = Settings(Ecuts, kpts, def_E, def_k) # create the settings object
 
-    return params
+    return params # return the object
 
 
 
@@ -174,22 +267,42 @@ def get_params(path):
 
 # Class Tree:
 #    """
-
+    #You need to implement this!
 #   """
 
 
 def tree(root, branches = []):
     """
+    A tree function which builds a tree object from a root label and a list of branches
 
+    Args:
+        root: in this application either 'Ecuts' or 'Kpts', but is supposed to be the parent label
+        branches: A list of the elements to be made, e.g. the list of energies you are testing
+
+    Returns:
+        A tree, which is a list with first element a label for the tree, second element is a list of branches which are
+            themselves trees whose roots are the sub directories to be created
+
+    Raises:
+        If the branches aren't themselves trees then it raises an error that they must be trees themselves.
     """
 
-    """"give it elements of a two element  list. first is a string, either 'Ecuts' or 'kpts'. second is the list of elements to make"""
     for branch in branches:
         assert is_tree(branch), 'branches must be trees'
     return [root] + list(branches)
 
 def root(tree):
     """
+    Returns the root of a tree.
+
+    Args:
+        the tree
+
+    Returns:
+        the root label of a tree, i.e. the first element of a list.
+
+    Raises:
+        Nothing
 
     """
 
@@ -197,13 +310,26 @@ def root(tree):
 
 def branches(tree):
     """
+    Returns the branches of a tree.
 
+    Args:
+        the tree
+
+    Returns:
+        the branches of a tree, i.e. the rest of the elements of the list
     """
 
     return tree[1:]
 
 def is_tree(tree):
     """
+    Tests if an argument is a tree.
+
+    Args:
+        the tree to be tested
+
+    Returns:
+        True if its a tree, false otherwise
 
     """
 
@@ -216,15 +342,35 @@ def is_tree(tree):
 
 def is_leaf(tree):
     """
+    Tests if a tree is a leaf. i.e. it has no branches
 
+    Args:
+        tree to be tested
+
+    Returns:
+        False if it has branches, True if the list of branhces is empty
     """
 
     return not branches(tree)
 
+
+
+
 def flatten_list(lst):
     """
+    Flattens a nested list.
 
+    Args:
+        list to be flattened
+
+    Returns:
+        a list that has depth 1
+
+    Raises:
+        assertion error if a list isn't passed in
     """
+
+    assert isinstance(lst, list), "you didn't pass a list!"
 
     if isinstance(lst[0], list):
         if len(lst[0])>1:
@@ -239,17 +385,31 @@ def flatten_list(lst):
 ##########################################################################################
 
 
+
+
 ##########################################################################################
 # Classes
 ##########################################################################################
+##########################################################################################
+##########################################################################################
+##########################################################################################
+
+
 class Settings:
     """
-
+    A settings object which stores the user settings, only method is to create a tree from these settings.
     """
 
     def __init__(self, Ecuts, kpts, def_E, def_k):
         """
+        Initialises the object with the user settings. This could be changed to instead pass just a path and
+            call the necessary functions to pull them out. This current form is more general though...
 
+        Args:
+            Ecuts: list of cutoff energies in nested list e.g. [['400'],['450'],['500']]
+            kpts: list of kpoints e.g. [['7','1','1'],['8','1','1']]
+            def_E: default energy to use when testing kpoints as a list e.g. ['400']
+            def_k: default kpoints to use when testing energies e.g. ['7','1','1']
         """
 
         self.ecuts = Ecuts
@@ -257,136 +417,133 @@ class Settings:
         self.def_e = def_E
         self.def_k = def_k
 
-        self.e_tree = []
+        self.e_tree = [] # initialise these as empty until the tree maker methods is called
         self.k_tree = []
 
 
-    def make_file_tree(self,e_label = 'E_cutoff' , k_label = 'Kpts'):
+    def make_file_tree(self, e_label = 'E_cutoff' , k_label = 'Kpts'):
+        """
+        Makes tree structures for energies and kpoints being tested.
+
+        Args:
+            e_label: the label for the tree for energies
+            k_label: the label for the tree for kpoints
+
+        Returns:
+            a list of the mutated instance attributes e_tree and k_tree
+
+        Raises:
+            Nothing, but tree function call may raise errors
         """
 
-        """
-
-        self.e_tree = tree(e_label, [tree(i) for i in self.ecuts])
+        self.e_tree = tree(e_label, [tree(i) for i in self.ecuts]) # create the tree from the label and the list of
+                                                                    # energies in tree format
         self.k_tree = tree(k_label, [tree(i) for i in self.kpts])
 
         return [self.e_tree, self.k_tree]
 
 
+
+##########################################################################################
+# for creating directories
+##########################################################################################
+
 class FileMaker:
     """
-
+    A class with methods to make directories, add files to them and edit the files
     """
 
-    def __init__(self, settings, e_tree, k_tree):
+    def __init__(self, settings):
+        """
+        Initialise the settings to be used, as well as the log files recording what happens.
+
+        Args:
+            settings: the settings object which has everything in it
         """
 
-        """
-
-        self.e_tree = e_tree
-        self.k_tree = k_tree
+        #self.e_tree = settings.e_tree # Don't do this!!!! change all calls to e_tree to self.settings.e_tree!
+        #self.k_tree = settings.k_tree
         self.settings = settings
         self.made_parents = {}
         self.added_files = {}
         self.edit_files = {}
 
 
-    def dir_maker(self, tree):
+    def dir_maker(self):
         """
 
         """
+        trees = [self.settings.e_tree, self.settings.k_tree]
 
-        a = subprocess.Popen(['mkdir', root(tree)], stdout = subprocess.PIPE, stderr = subprocess.PIPE) # makes either e.g. kpts or Ecuts
-        a = a.communicate()
-        b = [subprocess.Popen(["mkdir", root(tree)+'/'+"-".join(root(i))], stdout = subprocess.PIPE, stderr = subprocess.PIPE) for i in branches(tree)] #makes all the sub directories to be filled. join rejoins the kpoints into one string for this
-        b = [i.communicate() for i in b]
+        for i in trees:
+            a = subprocess.Popen(['mkdir', root(i)], stdout = subprocess.PIPE, stderr = subprocess.PIPE) # makes either e.g. kpts or Ecuts
+            a = a.communicate()
+            b = [subprocess.Popen(["mkdir", root(i)+'/'+"-".join(root(j))], stdout = subprocess.PIPE, stderr = subprocess.PIPE) for j in branches(i)] #makes all the sub directories to be filled. join rejoins the kpoints into one string for this
+            b = [i.communicate() for i in b]
 
-        self.made_parents[root(tree) + ' made output'] = a
-        self.made_parents[root(tree) + ' sub directories'] = dict(zip(flatten_list(branches(tree)), b))
+            self.made_parents[root(i) + ' made output'] = a
+            self.made_parents[root(i) + ' sub directories'] = dict(zip(flatten_list(branches(i)), b))
 
         return False
 
 
-    def file_editor(self, tree):
+    def file_adder(self):
         """
 
         """
+        trees = [self.settings.e_tree, self.settings.k_tree]
 
-        e_def = self.settings.def_e  # default E and K to be used)
-        k_def = self.settings.def_k
-        param_label = root(tree)
-
-        self.edit_files[param_label] = 'editing'
-        status = []
-        if 'Kpts' in param_label:
-            for i in branches(tree):
-                edit_kpts(param_label, i[0], i) # edit kpts file
-                print(e_def)
-                edit_incar(param_label, e_def, i) # edit incar file
-                status.append('Success')
-        elif 'E_cutoff' in param_label:
-            for i in branches(tree):
-                edit_incar(param_label, i[0], i) # edit incar file
-                edit_kpts(param_label, k_def, i) # edit kpts file
-                status.append('Success')
-        else:
-            return "enter a valid label for editing files"
-
-        self.edit_files[param_label+' instances'] = dict(zip(flatten_list(branches(tree)), status))
-        return False
+        for j in trees:
 
 
-    def file_adder(self, tree):
-        """
+            a = [subprocess.Popen("cp INPUT/* "+ root(j)+'/'+"-".join(root(i)), shell = True, stdout = subprocess.PIPE, stderr = subprocess.PIPE) for i in branches(j)]
+            a = [i.communicate() for i in a]
+            b = [subprocess.Popen(['rm', root(j) + '/' + "-".join(root(i))+'/conv_params'], stdout = subprocess.PIPE, stderr = subprocess.PIPE) for i in branches(j)] # lazy way to get rid of the accidental conv_params carried over
+            b = [i.communicate() for i in b]
 
-        """
-
-        a = [subprocess.Popen("cp INPUT/* "+ root(tree)+'/'+"-".join(root(i)), shell = True, stdout = subprocess.PIPE, stderr = subprocess.PIPE) for i in branches(tree)]
-        a = [i.communicate() for i in a]
-        b = [subprocess.Popen(['rm', root(tree) + '/' + "-".join(root(i))+'/conv_params'], stdout = subprocess.PIPE, stderr = subprocess.PIPE) for i in branches(tree)] # lazy way to get rid of the accidental conv_params carried over
-        b = [i.communicate() for i in b]
-
-        self.added_files[root(tree) + ' copied successfully'] = dict(zip(flatten_list(branches(tree)), a))
-        self.added_files['removed conv_params from all?'] = dict(zip(flatten_list(branches(tree)), b))
+            self.added_files[root(j) + ' copied successfully'] = dict(zip(flatten_list(branches(j)), a))
+            self.added_files['removed conv_params from all?'] = dict(zip(flatten_list(branches(j)), b))
 
         return False
 
 
-
-class log_file:
-    """
-
-    """
-
-    def __init__(self, settings, filemaker, title = 'log_file'):
+    def file_editor(self):
         """
 
         """
+        trees = [self.settings.e_tree, self.settings.k_tree]
 
-        self.date = datetime.datetime.now().strftime("%Y-%m-%d")
-        self.time = datetime.datetime.now().time().strftime("%H:%M:%S")
-        self.cwd = os.getcwd() # of the script!
-        self.settings = settings
-        self.def_e = settings.def_e
-        self.def_k = settings.def_k
-        self.trees = [filemaker.e_tree, filemaker.k_tree]
-        self.made_dirs = filemaker.made_parents
-        self.added_files = filemaker.added_files
-        self.edited_files = filemaker.edit_files
-        self.title = title
+        for j in trees:
+            param_label = root(j)
 
+            self.edit_files[param_label] = 'editing'
+            status = []
+            if 'Kpts' in param_label:
+                for i in branches(j):
+                    edit_kpts(param_label, i[0], i) # edit kpts file
+                    edit_incar(param_label, self.settings.def_e, i) # edit incar file
+                    status.append('Success')
+            elif 'E_cutoff' in param_label:
+                for i in branches(j):
+                    edit_incar(param_label, i[0], i) # edit incar file
+                    edit_kpts(param_label, self.settings.def_k, i) # edit kpts file
+                    status.append('Success')
+            else:
+                return "enter a valid label for editing files"
 
-    def create_log(self):
-        """
-
-        """
-
-        path = self.cwd + '/' + self.title
-        lines = ["Date: " + self.date, "Time: " + self.time, "Working Directory: " + self.cwd, "default E: " + str(self.def_e), "default Kpts: " + str(self.def_k) ,"","file trees: ", str(self.trees),
-                 "","NOTE: the format of these logs is not great, if there are no obvious messages then everything is okay","","logs from making directories: ", str(self.made_dirs), "","logs from adding files: ", str(self.added_files), "",
-                 "logs from editing files: ", str(self.edited_files)]  # make lines
-        open(path, 'w').write('\n'.join(lines))  # write list to file
+            self.edit_files[param_label+' instances'] = dict(zip(flatten_list(branches(j)), status))
+        return False
 
 
+
+
+
+
+
+
+##########################################################################################
+# for analysing
+##########################################################################################
 
 class FindFileStructure:
     """
@@ -521,6 +678,7 @@ class FindFileStructure:
         return False
 
 
+
 class FindEnergies:
     """
 
@@ -570,7 +728,6 @@ class FindEnergies:
             if root(b) not in self.energies_list[parent_name]:
                 self.energies_list[parent_name][root(b)] = "'y=' wasn't found in the OUTCAR file"
         return False
-
 
 class WriteCSVFile:
     """
@@ -658,8 +815,51 @@ class WriteCSVFile:
 
         return False
 
+
+##########################################################################################
+# log file
+##########################################################################################
+class log_file:
+    """
+
+    """
+
+    def __init__(self, settings, filemaker, title = 'log_file'):
+        """
+
+        """
+
+        self.date = datetime.datetime.now().strftime("%Y-%m-%d")
+        self.time = datetime.datetime.now().time().strftime("%H:%M:%S")
+        self.cwd = os.getcwd() # of the script!
+        self.settings = settings
+        self.def_e = settings.def_e
+        self.def_k = settings.def_k
+        self.trees = [settings.e_tree, settings.k_tree]
+        self.made_dirs = filemaker.made_parents
+        self.added_files = filemaker.added_files
+        self.edited_files = filemaker.edit_files
+        self.title = title
+
+
+    def create_log(self):
+        """
+
+        """
+
+        path = self.cwd + '/' + self.title
+        lines = ["Date: " + self.date, "Time: " + self.time, "Working Directory: " + self.cwd, "default E: " + str(self.def_e), "default Kpts: " + str(self.def_k) ,"","file trees: ", str(self.trees),
+                 "","NOTE: the format of these logs is not great, if there are no obvious messages then everything is okay","","logs from making directories: ", str(self.made_dirs), "","logs from adding files: ", str(self.added_files), "",
+                 "logs from editing files: ", str(self.edited_files)]  # make lines
+        open(path, 'w').write('\n'.join(lines))  # write list to file
+
+
 ##########################################################################################
 ##########################################################################################
+##########################################################################################
+##########################################################################################
+
+
 
 ##########################################################################################
 # functions to run
@@ -672,16 +872,13 @@ def make_conv_files():
     path = 'INPUT/conv_params'
     choices = get_params(path) # an object which has all the settings stored in it
     file_trees = choices.make_file_tree() # first element is the Ecut tree, second is kpts tree
-    files = FileMaker(choices, file_trees[0], file_trees[1]) # make files object with trees to be created and choices
+    files = FileMaker(choices) # make files object with trees to be created and choices
 
-    files.dir_maker(files.e_tree) # make directories
-    files.dir_maker(files.k_tree)
+    files.dir_maker() # make directories
 
-    files.file_adder(files.e_tree) # add stock files to directories
-    files.file_adder(files.k_tree)
+    files.file_adder() # add stock files to directories
 
-    files.file_editor(files.e_tree) # edit the files as needed
-    files.file_editor(files.k_tree)
+    files.file_editor() # edit the files as needed
 
     log = log_file(choices, files) # create log file
     log.create_log()
