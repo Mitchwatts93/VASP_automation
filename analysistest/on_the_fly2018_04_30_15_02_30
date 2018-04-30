@@ -1,0 +1,19 @@
+Date: 2018-04-30
+Time: 15:02:30
+Working Directory: /mnt/c/Users/mcwatts/Documents/PhD/VASP/automation/analysistest
+default E: 0
+default Kpts: ['6', '6', '6']
+
+file trees: 
+[['E_cutoff/fly', [['400']], [['500']], [['600']]], ['Kpts']]
+
+NOTE: the format of these logs is not great, if there are no obvious messages then everything is okay
+
+logs from making directories: 
+{'E_cutoff/fly sub directories': {'500': (b'', b''), '400': (b'', b'mkdir: cannot create directory \xe2\x80\x98E_cutoff/fly/400\xe2\x80\x99: File exists\n'), '600': (b'', b'')}, 'E_cutoff/fly made output': (b'', b'mkdir: cannot create directory \xe2\x80\x98E_cutoff/fly\xe2\x80\x99: File exists\n')}
+
+logs from adding files: 
+{'E_cutoff/fly copied successfully': {'500': (b'', b''), '400': (b'', b''), '600': (b'', b'')}, 'removed conv_params from all?': {'500': (b'', b''), '400': (b'', b''), '600': (b'', b'')}}
+
+logs from editing files: 
+{'E_cutoff/fly': 'editing', 'E_cutoff/fly instances': {'500': 'Success', '400': 'Success', '600': 'Success'}}

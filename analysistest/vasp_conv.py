@@ -18,6 +18,7 @@ import argparse         # used for cmd line input
 # - fix re-intialising trees etc in new classes, just refer to the originals! instead initialise
 # e.g. the settings object
 # - test running from path, do directory paths etc work or need editing with cwd?
+# - The file directories to create on the fly have to be named either E_cutoff or Kpts. Fix this.
 ###########################################################################################
 ##########################################################################################
 ##########################################################################################
@@ -113,6 +114,25 @@ def file_reader(filename = 'conv_params'):
     info[3] = info[3][0]
 
     return info
+
+def get_no_atoms(filename = 'INPUT/POSCAR'):
+
+    with open(filename) as f:
+        lines = f.readlines()
+    lines = [i.strip() for i in lines] # each element in lines is a string of a line from the file
+    lines = lines[5:7] #only interested in lines 6 and 7 in the file -  (python 0 indexing)
+
+    no_atoms = 0
+    for i in lines:
+        i = ''.join([j for j in i if j.isdigit()])
+        if i: #i.e. if there are any numbers in the line!
+            no_atoms = int(i)
+
+    if not no_atoms:
+        no_atoms = 1
+        print('COULDNT FIND THE NUMBER OF ATOMS!!')
+
+    return no_atoms
 
 
 def edit_kpts(param_label, i, dir, line_key = 'Gamma', file = 'KPOINTS'):
@@ -259,6 +279,13 @@ def get_params(path = 'INPUT/conv_params'):
 
 
 
+def remove_fly_bodge(path):
+    path_fly = path +'fly/'
+    subprocess.call("mv "+path_fly+"* "+path, shell=True)
+    subprocess.call("rm -r "+path_fly, shell=True)
+
+    return False
+
 
 
 ##########################################################################################
@@ -369,7 +396,6 @@ def flatten_list(lst):
     Raises:
         assertion error if a list isn't passed in
     """
-
     assert isinstance(lst, list), "you didn't pass a list!"
 
     if isinstance(lst[0], list):
@@ -469,11 +495,14 @@ class FileMaker:
         self.edit_files = {}
 
 
-    def dir_maker(self):
+    def dir_maker(self, e_or_k=2):
         """
 
         """
         trees = [self.settings.e_tree, self.settings.k_tree]
+
+        if e_or_k !=2:
+            trees = [trees[e_or_k]]
 
         for i in trees:
             a = subprocess.Popen(['mkdir', root(i)], stdout = subprocess.PIPE, stderr = subprocess.PIPE) # makes either e.g. kpts or Ecuts
@@ -487,11 +516,14 @@ class FileMaker:
         return False
 
 
-    def file_adder(self):
+    def file_adder(self, e_or_k=2):
         """
 
         """
         trees = [self.settings.e_tree, self.settings.k_tree]
+
+        if e_or_k !=2:
+            trees = [trees[e_or_k]]
 
         for j in trees:
 
@@ -507,14 +539,19 @@ class FileMaker:
         return False
 
 
-    def file_editor(self):
+    def file_editor(self, e_or_k=2):
         """
 
         """
         trees = [self.settings.e_tree, self.settings.k_tree]
 
+        if e_or_k !=2:
+            trees = [trees[e_or_k]]
+
         for j in trees:
+
             param_label = root(j)
+            print(param_label)
 
             self.edit_files[param_label] = 'editing'
             status = []
@@ -571,6 +608,8 @@ class FindFileStructure:
         ls = (ls.strip()).split(
             '\n')  # ls is newline delimited, split it into elements of a list for each directory or file
 
+
+
         # loop through the ls list and pick out the directory names similar to k or e and what their names are
         self.parent_dirs = self.test_directories(ls, self.kpts_or_ecut_dir)  # two element dictionary with names of parent directories found
         # key is 'e' or 'k' and value is the thing found
@@ -583,8 +622,23 @@ class FindFileStructure:
         e_sub = subprocess.check_output(['ls', self.parent_dirs['e'] + '/']).decode('ascii')
         e_sub = (e_sub.strip()).split('\n')  # split any whitespace off and split into elements
 
+        if 'fly' in e_sub:
+            path = self.parent_dirs['e']+'/'
+            remove_fly_bodge(path)
+            e_sub = subprocess.check_output(['ls', self.parent_dirs['e'] + '/']).decode('ascii')
+            e_sub = (e_sub.strip()).split('\n')  # split any whitespace off and split into elements
+
+
         k_sub = subprocess.check_output(['ls', self.parent_dirs['k'] + '/']).decode('ascii')
         k_sub = (k_sub.strip()).split('\n')
+
+        if 'fly' in k_sub:
+            path = self.parent_dirs['k']+'/'
+            remove_fly_bodge(path)
+            k_sub = subprocess.check_output(['ls', self.parent_dirs['k'] + '/']).decode('ascii')
+            k_sub = (k_sub.strip()).split('\n')
+
+
 
         # check subdirectories are correct, throw away any that aren't the right format i.e. energies must be a integer
         # kpts must be a string containing two dashes
@@ -868,8 +922,8 @@ def make_conv_files():
     """
 
     """
-
-    path = 'INPUT/conv_params'
+    path = ''
+    path += 'INPUT/conv_params'
     choices = get_params(path) # an object which has all the settings stored in it
     file_trees = choices.make_file_tree() # first element is the Ecut tree, second is kpts tree
     files = FileMaker(choices) # make files object with trees to be created and choices
@@ -893,7 +947,7 @@ def analyse_conv_files():
     a = subprocess.Popen(['mkdir', 'convergence_details'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # makes a folder to put the convergence details in
     files = FindFileStructure()
     files.get_file_structure() # this sets objects values to the cutoff energies, kpts tested and the defaults that were used.
-    # note that the defaqults are only tested on the first listed directory that was deemed to be correct. e.g. 1000
+    # note that the defaults are only tested on the first listed directory that was deemed to be correct. e.g. 1000
     choices = Settings(files.e_sub, files.k_sub, files.def_E, files.def_k) # create settings object with the run conv testing settings
 
     file_trees = choices.make_file_tree(files.parent_dirs['e'], files.parent_dirs['k']) # list with first element as e_tree and second element as k_tree
@@ -902,6 +956,13 @@ def analyse_conv_files():
     find_energies.parent_iterator()
 
     energy_dict = find_energies.energies_list # this returns a dictionary with two keys, E and K (or their names as directories found already)
+
+    #scale the energy by the number of atoms in the cell
+    no_atoms = get_no_atoms()
+    for i in energy_dict:
+        for j in energy_dict[i]:
+            energy_dict[i][j] = energy_dict[i][j]/no_atoms
+
     # the values of these are dictionaries with keys as the names of the folders and values as the energy in the OUTCAR
 
     # you should edit that class to also save other important details from runs
@@ -912,6 +973,7 @@ def analyse_conv_files():
     written.add_POSCAR() # copies the poscar from input into this folder
 
 
+#######################The file directories to create on the fly have to be named either E_cutoff or Kpts. Fix this.
 def on_the_fly():
     """
 
@@ -939,13 +1001,13 @@ def on_the_fly():
         choices = Settings([], kpts, def_e, '0-0-0') # pass in the defaults for what you want to make
         k_tree = choices.make_file_tree()[1] # the ktree is the 1st element in the list returned
         k_tree[0] += '/fly' # put into a subdirectory fly for ease of running
-        files = FileMaker(choices, tree(''), k_tree) # make the object for creating everything
+        files = FileMaker(choices)#, tree(''), k_tree) # make the object for creating everything
 
-        files.dir_maker(k_tree) # make the directories
+        files.dir_maker(1) #k_tree) # make the directories
 
-        files.file_adder(files.k_tree) # add the default files from INPUT
+        files.file_adder(1) #files.k_tree) # add the default files from INPUT
 
-        files.file_editor(k_tree) # edit the files according to the user inputs
+        files.file_editor(1) #k_tree) # edit the files according to the user inputs
 
         date = datetime.datetime.now().strftime("%Y_%m_%d")
         time = datetime.datetime.now().time().strftime("%H_%M_%S")
@@ -967,13 +1029,13 @@ def on_the_fly():
         choices = Settings(energies, [], '0', def_k) # pass in the defaults for what you want to make
         e_tree = choices.make_file_tree()[0] # the etree is the 0th element in the list returned
         e_tree[0] += '/fly' # put into a subdirectory fly for ease of running
-        files = FileMaker(choices, e_tree, tree('')) # make the object for creating everything
+        files = FileMaker(choices) #, e_tree, tree('')) # make the object for creating everything
 
-        files.dir_maker(e_tree) # make the directories
+        files.dir_maker(0) #e_tree) # make the directories
 
-        files.file_adder(files.e_tree) # add the default files from INPUT
+        files.file_adder(0) #files.e_tree) # add the default files from INPUT
 
-        files.file_editor(e_tree) # edit the files according to the user inputs
+        files.file_editor(0) #e_tree) # edit the files according to the user inputs
 
         date = datetime.datetime.now().strftime("%Y_%m_%d")
         time = datetime.datetime.now().time().strftime("%H_%M_%S")
@@ -1015,4 +1077,4 @@ else:
     print('enter either m or a to run the program. m will make files, a will analyse them')
 
 ##########################################################################################
-##########################################################################################
+#########################################################################################
