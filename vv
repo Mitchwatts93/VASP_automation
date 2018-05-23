@@ -1,0 +1,50 @@
+ import pymatgen as mg
+>>> from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+>>> BP = mg.Structure.from_file("CONTCAR")
+C:\Users\mcwatts\AppData\Local\Continuum\anaconda3\lib\site-packages\pymatgen\io\cif.py:44: UserWarning: Please install optional dependency pybtex if youwant to extract references from CIF files.
+  warnings.warn("Please install optional dependency pybtex if you"
+>>> BPr = mg.Structure.from_file("../../testribbons/POSCAR")
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "C:\Users\mcwatts\AppData\Local\Continuum\anaconda3\lib\site-packages\pymatgen\core\structure.py", line 1628, in from_file
+    with zopen(filename, "rt") as f:
+  File "C:\Users\mcwatts\AppData\Local\Continuum\anaconda3\lib\site-packages\monty-1.0.2-py3.6.egg\monty\io.py", line 71, in zopen
+    return open(filename, *args, **kwargs)
+FileNotFoundError: [Errno 2] No such file or directory: '../../testribbons/POSCAR'
+>>> BPr = mg.Structure.from_file("../testribbons/POSCAR")
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "C:\Users\mcwatts\AppData\Local\Continuum\anaconda3\lib\site-packages\pymatgen\core\structure.py", line 1628, in from_file
+    with zopen(filename, "rt") as f:
+  File "C:\Users\mcwatts\AppData\Local\Continuum\anaconda3\lib\site-packages\monty-1.0.2-py3.6.egg\monty\io.py", line 71, in zopen
+    return open(filename, *args, **kwargs)
+FileNotFoundError: [Errno 2] No such file or directory: '../testribbons/POSCAR'
+>>> BPr = mg.Structure.from_file("../testribbons/POSCAR")
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "C:\Users\mcwatts\AppData\Local\Continuum\anaconda3\lib\site-packages\pymatgen\core\structure.py", line 1628, in from_file
+    with zopen(filename, "rt") as f:
+  File "C:\Users\mcwatts\AppData\Local\Continuum\anaconda3\lib\site-packages\monty-1.0.2-py3.6.egg\monty\io.py", line 71, in zopen
+    return open(filename, *args, **kwargs)
+FileNotFoundError: [Errno 2] No such file or directory: '../testribbons/POSCAR'
+>>> BPr = mg.Structure.from_file("../POSCAR")
+Traceback (most recent call last):
+  File "C:\Users\mcwatts\AppData\Local\Continuum\anaconda3\lib\site-packages\pymatgen\io\vasp\inputs.py", line 300, in from_string
+    natoms = [int(i) for i in lines[5].split()]
+  File "C:\Users\mcwatts\AppData\Local\Continuum\anaconda3\lib\site-packages\pymatgen\io\vasp\inputs.py", line 300, in <listcomp>
+    natoms = [int(i) for i in lines[5].split()]
+ValueError: invalid literal for int() with base 10: 'P'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "C:\Users\mcwatts\AppData\Local\Continuum\anaconda3\lib\site-packages\pymatgen\core\structure.py", line 1637, in from_file
+    merge_tol=merge_tol)
+  File "C:\Users\mcwatts\AppData\Local\Continuum\anaconda3\lib\site-packages\pymatgen\core\structure.py", line 1571, in from_str
+    read_velocities=False).structure
+  File "C:\Users\mcwatts\AppData\Local\Continuum\anaconda3\lib\site-packages\pymatgen\io\vasp\inputs.py", line 341, in from_string
+    atomic_symbols.extend([symbols[i]] * natoms[i])
+IndexError: list index out of range
+>>> BPr = mg.Structure.from_file("../POSCAR")
+>>> BPr = mg.Structure.from_file("../POSCAR", 0.1)
