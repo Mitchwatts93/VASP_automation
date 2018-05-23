@@ -551,7 +551,6 @@ class FileMaker:
         for j in trees:
 
             param_label = root(j)
-            print(param_label)
 
             self.edit_files[param_label] = 'editing'
             status = []
@@ -619,36 +618,55 @@ class FindFileStructure:
         #######################################################
 
         # get subdirectories as lists
-        e_sub = subprocess.check_output(['ls', self.parent_dirs['e'] + '/']).decode('ascii')
-        e_sub = (e_sub.strip()).split('\n')  # split any whitespace off and split into elements
-
-        if 'fly' in e_sub:
-            path = self.parent_dirs['e']+'/'
-            remove_fly_bodge(path)
+        try:
             e_sub = subprocess.check_output(['ls', self.parent_dirs['e'] + '/']).decode('ascii')
             e_sub = (e_sub.strip()).split('\n')  # split any whitespace off and split into elements
+            if 'fly' in e_sub:
+                path = self.parent_dirs['e'] + '/'
+                remove_fly_bodge(path)
+                e_sub = subprocess.check_output(['ls', self.parent_dirs['e'] + '/']).decode('ascii')
+                e_sub = (e_sub.strip()).split('\n')  # split any whitespace off and split into elements
+                # check subdirectories are correct, throw away any that aren't the right format i.e. energies must be a integer
+                # kpts must be a string containing two dashes
+            e_sub = list(self.test_directories(e_sub, self.e_test).keys())  # dictionary where keys and values are equal. contains only directories that passed the test
+
+            for i in range(len(e_sub)):
+                e_sub[i] = [e_sub[i], self.get_def(self.parent_dirs['e'], e_sub[i], 'KPOINTS', 'Gamma')]  # list where second element is the kpoints used!
+
+            self.e_sub = e_sub
+
+            self.def_k = self.get_def(self.parent_dirs['e'], self.e_sub[0][0], 'KPOINTS', 'Gamma') #self.esub changed
+
+        except KeyError as er:
+            print("no energies sub-directory found!")
+            self.parent_dirs['e'] = ''
+            self.e_sub = ['']
+            self.def_k = 0
 
 
-        k_sub = subprocess.check_output(['ls', self.parent_dirs['k'] + '/']).decode('ascii')
-        k_sub = (k_sub.strip()).split('\n')
-
-        if 'fly' in k_sub:
-            path = self.parent_dirs['k']+'/'
-            remove_fly_bodge(path)
+        try:
             k_sub = subprocess.check_output(['ls', self.parent_dirs['k'] + '/']).decode('ascii')
             k_sub = (k_sub.strip()).split('\n')
+            if 'fly' in k_sub:
+                path = self.parent_dirs['k'] + '/'
+                remove_fly_bodge(path)
+                k_sub = subprocess.check_output(['ls', self.parent_dirs['k'] + '/']).decode('ascii')
+                k_sub = (k_sub.strip()).split('\n')
+            k_sub = list(self.test_directories(k_sub, self.k_test).keys())  # we pull out just the keys because we want the keys
 
+            #to add defaults on each row
+            for i in range(len(k_sub)):
+                k_sub[i] = [k_sub[i], self.get_def(self.parent_dirs['k'], k_sub[i], 'INCAR', 'ENCUT')] #list where second element is the energy used!
 
+            self.k_sub = k_sub
 
-        # check subdirectories are correct, throw away any that aren't the right format i.e. energies must be a integer
-        # kpts must be a string containing two dashes
-        e_sub = list(self.test_directories(e_sub, self.e_test).keys())  # dictionary where keys and values are equal. contains only directories that passed the test
-        k_sub = list(self.test_directories(k_sub, self.k_test).keys())  # we pull out just the keys because we want the keys
+            self.def_E = self.get_def(self.parent_dirs['k'], self.k_sub[0][0], 'INCAR', 'ENCUT') #self.ksub changed
 
-        self.e_sub = e_sub
-        self.k_sub = k_sub
-        self.def_k = self.get_def(self.parent_dirs['e'], self.e_sub[0], 'KPOINTS', 'Gamma')
-        self.def_E = self.get_def(self.parent_dirs['k'], self.k_sub[0], 'INCAR', 'ENCUT')
+        except KeyError as er:
+            print("no energies sub-directory found!")
+            self.parent_dirs['k'] = ''
+            self.k_sub = ['']
+            self.def_E = 0
 
         return False
 
@@ -752,10 +770,8 @@ class FindEnergies:
         """
 
         """
-
         e_name = root(self.e_tree)
         self.file_iterator(e_name, self.e_tree)
-
         k_name = root(self.k_tree)
         self.file_iterator(k_name, self.k_tree)
 
@@ -765,22 +781,28 @@ class FindEnergies:
         """
 
         """
-
         self.energies_list[parent_name] = {}
         for b in branches(tree): #iterate over the directories listed in the tree
-            file = parent_name + '/' + root(b) + '/' + 'OUTCAR'  # path to OUTCAR file
-            lines = open(file).read().splitlines()  # read lines into elements in a list
+            file = parent_name + '/' + root(b)[0] + '/' + 'OUTCAR'  # path to OUTCAR file
+            try:
+                lines = open(file).read().splitlines()  # read lines into elements in a list
+            except FileNotFoundError as e:
+                lines = ''
+                pass
             # iterate over the lines
             for i in lines:
                 if 'y=' in i:
                     numbers_on_line = re.findall('\d+', i)
-                    energy = -float(str(numbers_on_line[0]) + '.' + str(numbers_on_line[1])) # the first element of numbers is before decimal, second is after
-
-                    self.energies_list[parent_name][root(b)] = energy
+                    energy = -float(str(numbers_on_line[3]) + '.' + str(numbers_on_line[4])) # the third element of numbers is before decimal, fourth is after
+                    #note that elements zero and one are energy when sigma_>0, the second element is 0 from text sigma->0
+                    POSCAR_file = parent_name + '/' + root(b)[0] + '/' + 'POSCAR'
+                    atom_no = get_no_atoms(POSCAR_file)
+                    energy_per_atom = energy / atom_no
+                    self.energies_list[parent_name][root(b)[0]] = [root(b)[1] ,energy,energy_per_atom, atom_no]
                     # add this energy to dictionary with the current dir as label
 
-            if root(b) not in self.energies_list[parent_name]:
-                self.energies_list[parent_name][root(b)] = "'y=' wasn't found in the OUTCAR file"
+            if root(b)[0] not in self.energies_list[parent_name]:
+                self.energies_list[parent_name][root(b)[0]] = [root(b)[1], "'y=' wasn't found in the OUTCAR file", "not found", "N/A"]
         return False
 
 class WriteCSVFile:
@@ -814,7 +836,7 @@ class WriteCSVFile:
 
 
         #write information at top
-        lines = ["", "This file shows the convergence details for files checked in this folder.", "file was written (data recorded) on: "+ self.accessed + " at: " + self.time, ""]  # make lines
+        lines = ['\n'+'#'*70 +"\n", "This file shows the convergence details for files checked in this folder.", "file was written (data recorded) on: "+ self.accessed + " at: " + self.time, "\n"]  # make lines
         open(path, 'a').write('\n'.join(lines))  # write list to file
 
 
@@ -827,11 +849,16 @@ class WriteCSVFile:
         #write ecuts to csv
         e_tuples = [(i, j) for i, j in self.energies[self.e_name].items()] # convert the dictionary into a list of tuples for sorting
         e_tuples = sorted(e_tuples, key = lambda x: int(x[0])) # this sorts the tuples - they came from a dict
+        e_tuples[0] = (e_tuples[0][0], e_tuples[0][1][0],e_tuples[0][1][1],e_tuples[0][1][2], 0,e_tuples[0][1][3])
         for i in range(len(e_tuples)-1):
-            e_tuples[i+1] = (e_tuples[i+1][0], e_tuples[i+1][1], e_tuples[i+1][1] - e_tuples[i][1])
+            try:
+                e_tuples[i+1] = (e_tuples[i+1][0], e_tuples[i+1][1][0], e_tuples[i+1][1][1], e_tuples[i+1][1][2], e_tuples[i+1][1][2] - e_tuples[i][3], e_tuples[i+1][1][3])
+            except TypeError as e:
+                pass
+
         with open(path, 'a') as f:
-            w = csv.writer(f)
-            w.writerow(['cutoff energy', ' energy (eV)', ' difference (eV)'])
+            w = csv.writer(f, delimiter=',', escapechar=' ', quoting = csv.QUOTE_NONE)
+            w.writerow(['cutoff energy | K-points used | total energy (eV) |energy (eV) per atom | difference (eV) | number of atoms in POSCAR \n'])
             for row in e_tuples:
                 w.writerow(row)
 
@@ -843,13 +870,17 @@ class WriteCSVFile:
 
 
         # write kpts to csv
-        k_tuples = [(i, j) for i, j in self.energies[self.k_name].items()]
-        k_tuples = sorted(k_tuples, key=lambda x: (int(x[0][0]), int(x[0][2]), int(x[0][4:]))) # sort them by the kpoints
+        k_tuples = [(i.split('-'), j) for i, j in self.energies[self.k_name].items()]
+        k_tuples = sorted(k_tuples, key=lambda x: (int(x[0][0]), int(x[0][1]), int(x[0][2]))) # sort them by the kpoints
+        k_tuples[0] = ('-'.join(k_tuples[0][0]), k_tuples[0][1][0], k_tuples[0][1][1], k_tuples[0][1][2], 0,k_tuples[0][1][3])
         for i in range(len(k_tuples)-1):
-            k_tuples[i+1] = (k_tuples[i+1][0], k_tuples[i+1][1], k_tuples[i+1][1] - k_tuples[i][1])
+            try:
+                k_tuples[i+1] = ('-'.join(k_tuples[i+1][0]), k_tuples[i+1][1][0],k_tuples[i+1][1][1], k_tuples[i+1][1][2], k_tuples[i+1][1][2] - k_tuples[i][3], k_tuples[i+1][1][3])
+            except TypeError as e:
+                pass
         with open(path, 'a') as f:
-            w = csv.writer(f)
-            w.writerow(['kpoints', 'energy (eV)'])
+            w = csv.writer(f, delimiter=',', escapechar=' ', quoting=csv.QUOTE_NONE)
+            w.writerow(['kpoints | energy used | total energy (eV) | energy (eV) per atom | difference (eV) | number of atoms in POSCAR \n'])
             for row in k_tuples:
                 w.writerow(row)
 
@@ -948,21 +979,30 @@ def analyse_conv_files():
     files = FindFileStructure()
     files.get_file_structure() # this sets objects values to the cutoff energies, kpts tested and the defaults that were used.
     # note that the defaults are only tested on the first listed directory that was deemed to be correct. e.g. 1000
+
     choices = Settings(files.e_sub, files.k_sub, files.def_E, files.def_k) # create settings object with the run conv testing settings
 
+
     file_trees = choices.make_file_tree(files.parent_dirs['e'], files.parent_dirs['k']) # list with first element as e_tree and second element as k_tree
+
 
     find_energies = FindEnergies(choices.e_tree, choices.k_tree)
     find_energies.parent_iterator()
 
     energy_dict = find_energies.energies_list # this returns a dictionary with two keys, E and K (or their names as directories found already)
+    #print(energy_dict)
+
 
     #scale the energy by the number of atoms in the cell
-    no_atoms = get_no_atoms()
-    for i in energy_dict:
-        for j in energy_dict[i]:
-            energy_dict[i][j] = energy_dict[i][j]/no_atoms
-
+    #no_atoms = get_no_atoms()
+    #print(no_atoms)
+    #for i in energy_dict:
+     #   for j in energy_dict[i]:
+    #        try:
+     #           energy_dict[i][j][1] = energy_dict[i][j][1]/no_atoms
+      #      except TypeError as e:
+       #         pass
+    #print(energy_dict)
     # the values of these are dictionaries with keys as the names of the folders and values as the energy in the OUTCAR
 
     # you should edit that class to also save other important details from runs

@@ -1,0 +1,19 @@
+Date: 2018-05-03
+Time: 15:26:16
+Working Directory: /mnt/c/Users/mcwatts/Documents/PhD/VASP/automation/analysistest
+default E: 0
+default Kpts: ['10', '10', '10']
+
+file trees: 
+[['E_cutoff/fly', [['400']], [['1000']]], ['Kpts']]
+
+NOTE: the format of these logs is not great, if there are no obvious messages then everything is okay
+
+logs from making directories: 
+{'E_cutoff/fly made output': (b'', b''), 'E_cutoff/fly sub directories': {'400': (b'', b''), '1000': (b'', b'')}}
+
+logs from adding files: 
+{'removed conv_params from all?': {'400': (b'', b''), '1000': (b'', b'')}, 'E_cutoff/fly copied successfully': {'400': (b'', b''), '1000': (b'', b'')}}
+
+logs from editing files: 
+{'E_cutoff/fly instances': {'400': 'Success', '1000': 'Success'}, 'E_cutoff/fly': 'editing'}
