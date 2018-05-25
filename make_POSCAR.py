@@ -317,7 +317,7 @@ def cell_expander(a,b,c,ln,ygap,spacing,xw=1,zw=1,distance_chopped=0):
 
 
 #function to build the poscar string
-def build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim, no_deleted, intercalant_atom='', intercalant_atom_no='', intercalant_atom_positions=np.array([]), edge_atom='', edge_atom_no='', edge_atom_positions=np.array([])):
+def build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim, no_deleted , edge_atom='', edge_atom_no='', edge_atom_positions=np.array([]) ,intercalant_atom='', intercalant_atom_no='', intercalant_atom_positions=np.array([])):
     """
     Fucntion to write the details of atom type, cell dimensions and atom positions to POSCAR format string.
     UPDATE TO be able to write other types of atoms e.g. for Li intercalation? - or make new function which can call this
@@ -331,8 +331,8 @@ def build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim,
     """
 
     start_string=(str(atom_type)+' '+str(intercalant_atom)+ ' '+str(edge_atom)+'\n'+"1.0"+'\n') # the initial info in poscar
-    mid_string=('\n'+'\t'+str(atom_type)+str(intercalant_atom)+str(edge_atom)+'\n'+'\t'+
-        str(atoms_per_cell*ln*combo_rib_dim-no_deleted)+'\t'+str(intercalant_atom_no)+ '\t'+str(edge_atom_no)+'\n'+"Cartesian"+'\n') # the middle part with some  information
+    mid_string=('\n'+'\t'+str(atom_type)+ ' '+ str(intercalant_atom) + ' ' + str(edge_atom)+'\n'+'\t'+
+        str(atoms_per_cell*ln*combo_rib_dim-no_deleted)+'\t'*bool(intercalant_atom_no)+str(intercalant_atom_no)+ '\t'*bool(edge_atom_no)+str(edge_atom_no)+'\n'+"Cartesian"+'\n') # the middle part with some  information
     spaces=" " * 9 # spacing to make it look pretty
 
     # turn the numpy arrays for unit cell and positions into strings
@@ -352,7 +352,9 @@ def build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim,
     else:
         edge_atoms_string = ''
 
-    return start_string + '\t\t' + unit_cell_string + mid_string + '\t' + cartesian_string + intercalant_atom_string + edge_atoms_string# combine it all
+    print(edge_atoms_string)
+
+    return start_string + '\t\t' + unit_cell_string + mid_string + '\t' + cartesian_string + '\n\t'*bool(intercalant_atom_string) + intercalant_atom_string + '\n\t'*bool(edge_atoms_string)+edge_atoms_string# combine it all
 
 
 
@@ -461,11 +463,41 @@ def edge_modifier(atoms, xw=1, zw=1, edge_type='zz', atoms_to_delete=2):
 
     return atoms, distance_chopped, number_atoms_deleted
 
-def find_layers(atoms):
+def find_layers(atoms, layer_thickness = 2.5):
+
+    atoms_layers = dict()
+
+    unique = np.unique(atoms[:,1]) #unique height values
+
+    #this reduces unique to heights which are within distinct layers only
+    k=1
+    while k:
+        try:
+            if unique[k] - layer_thickness <= unique[k-1] <= unique[k] + layer_thickness:
+                unique = np.delete(unique, k , 0)
+            elif k <= len(unique):
+                k+=1
+
+        except IndexError as e:
+            break
+
+    # scan through and sort into layers
+    for j in unique:
+        for i in atoms:
+            i = i.tolist()
+            if ((j-layer_thickness) <= i[1] <= (j+layer_thickness)) and not any((i == x).all() for x in atoms_layers):
+                if j in atoms_layers:
+                    atoms_layers[j].append(i)
+                else:
+                    atoms_layers[j] = [i]
+    #now atoms_layers should be a dictionary where the key is a height within a layer, and the values are
+
+    return atoms_layers
+
     
 
 
-def add_pass_atoms(atoms, distance_from_edge,type = 'zz', density=1,atom_type=''):
+def add_pass_atoms(atoms , atom_type='' , distance_from_edge = 1, type = 'zz', density=1, edge_sensitivity = 1):
 
     # if density is 1/n then add atoms every nth atom along the periodic direction
     # Then merge with the edge modifier function to find edge atom positions
@@ -473,33 +505,23 @@ def add_pass_atoms(atoms, distance_from_edge,type = 'zz', density=1,atom_type=''
     #
 
     #atoms is a numpy array, start by finding the edges according to the type.
+    atoms_layers = find_layers(atoms)
+    edge_atoms = np.array([])
+
 
     if type=='zz':
-        edge_atoms = np.array([])
+        #iterate over layers
+        for i in atoms_layers.keys():
+            atom_layers_np = np.asarray(atoms_layers[i], dtype = np.float32)
 
+            max_width = np.amax(atom_layers_np[:,2]) # maximum edge value
+            min_width = np.amin(atom_layers_np[:,2]) # minimum edge value
 
-
-
-
-        #this method won't work if different layers edges change. ie from relaxed structure. You should figure out what
-        #a layer is, then iterate through each layer and find the edges!
-
-        unique, counts = np.unique(atoms[:, 2], return_counts=True)  # return unique c axis values and the number of atoms at each height (positions in non periodic direction)
-
-        max_width = max(unique)
-        min_width = min(unique)
-
-        heights = len(atoms)
-
-        for i in range(heights):
-            #iterate through every height position
-            if atoms[i,2] == max_width:
-                np.append(edge_atoms, [atoms[i,0],atoms[i,1],])
-            elif atoms[i,2] == min_width:
-
-
-
-
+            for j in atoms_layers[i]: #iterate over atoms in the layer we are looking at
+                if min_width - edge_sensitivity <= j[2] <= min_width + edge_sensitivity:
+                    edge_atoms = np.append(edge_atoms, [j[0], j[1], j[2] - distance_from_edge], axis = 0)
+                elif max_width - edge_sensitivity <= j[2] <= max_width + edge_sensitivity:
+                    edge_atoms = np.append(edge_atoms, [j[0], j[1], j[2] + distance_from_edge], axis=0)
 
     elif type=='ac':
         print('ac not supported yet')
@@ -508,7 +530,7 @@ def add_pass_atoms(atoms, distance_from_edge,type = 'zz', density=1,atom_type=''
         print('invalid type of ribbon passed')
         return False
 
-
+    edge_atoms = np.reshape(edge_atoms, (-1,3))
 
     return edge_atoms
 
@@ -637,14 +659,14 @@ def edit_cell():
     #intercalant_atom_positions = intercalate(atoms, layers, intercalant_atom, stacking='AB', xwidth=1, zwidth=1)
 
     #add passivated edges
-    #edge_atoms = add_pass_atoms(atoms, type='zz', density=1, atom_type='H')
-    #edge_atom_no =
+    edge_atoms = add_pass_atoms(atoms, 'H')
+    edge_atom_no = len(edge_atoms)
 
 
     #IMPROVE YOUR METHOD. DO THIS WITH A DICTIONARY OF ATOM TYPES:NP ARRAYS
-    print(atoms)
+
     # create poscar string for the given inputs
-    poscar_string = build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim, no_deleted) #, intercalant_atom, intercalant_atom_no, intercalant_atom_positions, edge_atom_type, edge_atom_no=0, edge_atom_positions)
+    poscar_string = build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim, no_deleted , 'H', edge_atom_no, edge_atoms) #, intercalant_atom, intercalant_atom_no, intercalant_atom_positions
 
     # write the poscar to file with filename
     write_to_file = write_poscar(poscar_string, filename)
