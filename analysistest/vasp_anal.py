@@ -1013,6 +1013,14 @@ def analyse_conv_files():
     written.add_POSCAR() # copies the poscar from input into this folder
 
 
+def analyse_geom_files():
+
+    #Do something similar to analysing convergence files but do it for geom optimisation
+
+    return False
+
+
+
 #######################The file directories to create on the fly have to be named either E_cutoff or Kpts. Fix this.
 def on_the_fly():
     """
@@ -1113,6 +1121,8 @@ elif args['function'] == 'a':
 elif args['function'] == 'fly':
     print('On the fly functionality not fully implemented yet! \n')
     on_the_fly()
+elif args['function'] == 'g':
+    analyse_geom_files()
 else:
     print('enter either m or a to run the program. m will make files, a will analyse them')
 
