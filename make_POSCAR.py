@@ -317,7 +317,7 @@ def cell_expander(a,b,c,ln,ygap,spacing,xw=1,zw=1,distance_chopped=0):
 
 
 #function to build the poscar string
-def build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim, no_deleted, intercalant_atom='', intercalant_atom_no=0, intercalant_atom_positions=np.array([])):
+def build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim, no_deleted, intercalant_atom='', intercalant_atom_no='', intercalant_atom_positions=np.array([]), edge_atom='', edge_atom_no='', edge_atom_positions=np.array([])):
     """
     Fucntion to write the details of atom type, cell dimensions and atom positions to POSCAR format string.
     UPDATE TO be able to write other types of atoms e.g. for Li intercalation? - or make new function which can call this
@@ -329,18 +329,16 @@ def build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim,
     :param combo_rib_dim: this is an integer for combination of ribbon widths to calculate the number of atoms in the cell
     :return: a string in POSCAR format
     """
-    # if there are no intercalant atoms, set to empty string
-    if not intercalant_atom:
-        intercalant_atom = ''
 
-    start_string=(str(atom_type)+' '+str(intercalant_atom)+'\n'+"1.0"+'\n') # the initial info in poscar
-    mid_string=('\n'+'\t'+str(atom_type)+str(intercalant_atom)+'\n'+'\t'+
-        str(atoms_per_cell*ln*combo_rib_dim-no_deleted)+'\t'+str(intercalant_atom_no)+'\n'+"Cartesian"+'\n') # the middle part with some  information
+    start_string=(str(atom_type)+' '+str(intercalant_atom)+ ' '+str(edge_atom)+'\n'+"1.0"+'\n') # the initial info in poscar
+    mid_string=('\n'+'\t'+str(atom_type)+str(intercalant_atom)+str(edge_atom)+'\n'+'\t'+
+        str(atoms_per_cell*ln*combo_rib_dim-no_deleted)+'\t'+str(intercalant_atom_no)+ '\t'+str(edge_atom_no)+'\n'+"Cartesian"+'\n') # the middle part with some  information
     spaces=" " * 9 # spacing to make it look pretty
 
     # turn the numpy arrays for unit cell and positions into strings
     unit_cell_string='\n\t\t'.join(spaces.join('%0.10f' %x for x in y) for y in unit_cell)
     cartesian_string='\n\t'.join(spaces.join('%0.10f' %x for x in y) for y in atoms)
+
 
     #if intercalant atom array is not empty then turn into a string, otherwise set to blank
     if intercalant_atom_positions.size:
@@ -348,7 +346,13 @@ def build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim,
     else:
         intercalant_atom_string = ''
 
-    return start_string + '\t\t' + unit_cell_string + mid_string + '\t' + cartesian_string + intercalant_atom_string # combine it all
+
+    if edge_atom_positions.size:
+        edge_atoms_string = '\n\t'.join(spaces.join('%0.10f' %x for x in y) for y in edge_atom_positions)
+    else:
+        edge_atoms_string = ''
+
+    return start_string + '\t\t' + unit_cell_string + mid_string + '\t' + cartesian_string + intercalant_atom_string + edge_atoms_string# combine it all
 
 
 
@@ -457,17 +461,56 @@ def edge_modifier(atoms, xw=1, zw=1, edge_type='zz', atoms_to_delete=2):
 
     return atoms, distance_chopped, number_atoms_deleted
 
+def find_layers(atoms):
+    
 
-def add_pass_atoms(atoms, type = 'zz', density=1,atom_type=''):
+
+def add_pass_atoms(atoms, distance_from_edge,type = 'zz', density=1,atom_type=''):
 
     # if density is 1/n then add atoms every nth atom along the periodic direction
     # Then merge with the edge modifier function to find edge atom positions
     # Then write to csv as for intercalant atoms
-    # 
+    #
+
+    #atoms is a numpy array, start by finding the edges according to the type.
+
+    if type=='zz':
+        edge_atoms = np.array([])
 
 
 
-    return atoms
+
+
+        #this method won't work if different layers edges change. ie from relaxed structure. You should figure out what
+        #a layer is, then iterate through each layer and find the edges!
+
+        unique, counts = np.unique(atoms[:, 2], return_counts=True)  # return unique c axis values and the number of atoms at each height (positions in non periodic direction)
+
+        max_width = max(unique)
+        min_width = min(unique)
+
+        heights = len(atoms)
+
+        for i in range(heights):
+            #iterate through every height position
+            if atoms[i,2] == max_width:
+                np.append(edge_atoms, [atoms[i,0],atoms[i,1],])
+            elif atoms[i,2] == min_width:
+
+
+
+
+
+    elif type=='ac':
+        print('ac not supported yet')
+        return False
+    else:
+        print('invalid type of ribbon passed')
+        return False
+
+
+
+    return edge_atoms
 
 
 
@@ -515,7 +558,7 @@ def set_stacking_periods(stacking):
 
 ln = 4
 xw = 1
-zw = 1
+zw = 3
 print('Layer number: '+str(ln)+'. Width of zz ribbon: '+str(zw))
 
 assert type(ln) == int, 'please insert an integer number of layers'
@@ -593,8 +636,15 @@ def edit_cell():
     # create intercalation atom cell
     #intercalant_atom_positions = intercalate(atoms, layers, intercalant_atom, stacking='AB', xwidth=1, zwidth=1)
 
+    #add passivated edges
+    #edge_atoms = add_pass_atoms(atoms, type='zz', density=1, atom_type='H')
+    #edge_atom_no =
+
+
+    #IMPROVE YOUR METHOD. DO THIS WITH A DICTIONARY OF ATOM TYPES:NP ARRAYS
+    print(atoms)
     # create poscar string for the given inputs
-    poscar_string = build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim, no_deleted) #, intercalant_atom, intercalant_atom_no, intercalant_atom_positions)
+    poscar_string = build_poscar(atoms, unit_cell, ln, atom_type, atoms_per_cell, combo_rib_dim, no_deleted) #, intercalant_atom, intercalant_atom_no, intercalant_atom_positions, edge_atom_type, edge_atom_no=0, edge_atom_positions)
 
     # write the poscar to file with filename
     write_to_file = write_poscar(poscar_string, filename)

@@ -1,0 +1,19 @@
+Date: 2018-04-11
+Time: 12:18:52
+Working Directory: /Users/mitchwatts/Documents/PhD/VASP/automation/analysistest
+default E: ['800']
+default Kpts: ['17', '1', '1']
+
+file trees: 
+[['E_cutoff', [['500']], [['550']], [['600']], [['650']], [['700']], [['750']], [['800']], [['850']], [['900']], [['950']], [['1000']]], ['Kpts', [['4', '1', '1']], [['5', '1', '1']], [['6', '1', '1']], [['7', '1', '1']], [['10', '1', '1']], [['3', '1', '1']]]]
+
+NOTE: the format of these logs is not great, if there are no obvious messages then everything is okay
+
+logs from making directories: 
+{'E_cutoff sub directories': {'900': ('', ''), '750': ('', ''), '850': ('', ''), '600': ('', ''), '950': ('', ''), '700': ('', ''), '550': ('', ''), '650': ('', ''), '800': ('', 'mkdir: E_cutoff/800: File exists\n'), '500': ('', 'mkdir: E_cutoff/500: File exists\n'), '1000': ('', '')}, 'E_cutoff made output': ('', 'mkdir: E_cutoff: File exists\n'), 'Kpts made output': ('', 'mkdir: Kpts: File exists\n'), 'Kpts sub directories': {'3-1-1': ('', ''), '4-1-1': ('', 'mkdir: Kpts/4-1-1: File exists\n'), '7-1-1': ('', 'mkdir: Kpts/7-1-1: File exists\n'), '10-1-1': ('', 'mkdir: Kpts/10-1-1: File exists\n'), '5-1-1': ('', 'mkdir: Kpts/5-1-1: File exists\n'), '6-1-1': ('', 'mkdir: Kpts/6-1-1: File exists\n')}}
+
+logs from adding files: 
+{'E_cutoff copied successfully': {'900': ('', ''), '750': ('', ''), '850': ('', ''), '600': ('', ''), '950': ('', ''), '700': ('', ''), '550': ('', ''), '650': ('', ''), '800': ('', ''), '500': ('', ''), '1000': ('', '')}, 'Kpts copied successfully': {'3-1-1': ('', ''), '4-1-1': ('', ''), '7-1-1': ('', ''), '10-1-1': ('', ''), '5-1-1': ('', ''), '6-1-1': ('', '')}, 'removed conv_params from all?': {'3-1-1': ('', ''), '4-1-1': ('', ''), '7-1-1': ('', ''), '10-1-1': ('', ''), '5-1-1': ('', ''), '6-1-1': ('', '')}}
+
+logs from editing files: 
+{'Kpts': 'editing', 'Kpts instances': {'3-1-1': 'Success', '4-1-1': 'Success', '7-1-1': 'Success', '10-1-1': 'Success', '5-1-1': 'Success', '6-1-1': 'Success'}, 'E_cutoff instances': {'900': 'Success', '750': 'Success', '850': 'Success', '600': 'Success', '950': 'Success', '700': 'Success', '550': 'Success', '650': 'Success', '800': 'Success', '500': 'Success', '1000': 'Success'}, 'E_cutoff': 'editing'}
