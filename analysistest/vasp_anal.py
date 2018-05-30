@@ -1017,6 +1017,80 @@ def analyse_geom_files():
 
     #Do something similar to analysing convergence files but do it for geom optimisation
 
+    # assume that all files are 1 level deep in here
+    ls = next(os.walk('.'))[1]# returns a list of directories only
+
+    energies = {}
+
+    # iterate through them all and analyse the OUTCAR in each folder
+
+    #fix this so it works for many E's! at the moment you overwrite them all!
+    for i in ls:
+        elist = []
+        file = i + '/' + 'OUTCAR'  # path to OUTCAR file
+        try:
+            lines = open(file).read().splitlines()  # read lines into elements in a list
+        except FileNotFoundError as e:
+            lines = ''
+            print('one of your subdirectories does not include an OUTCAR file')
+            pass
+        # iterate over the lines
+        for j in lines:
+            if 'y=' in j:
+                numbers_on_line = re.findall('\d+', j)
+                energy = -float(str(numbers_on_line[3]) + '.' + str(
+                    numbers_on_line[4]))  # the third element of numbers is before decimal, fourth is after
+                # note that elements zero and one are energy when sigma_>0, the second element is 0 from text sigma->0
+                POSCAR_file = i + '/' + 'POSCAR'
+                atom_no = get_no_atoms(POSCAR_file)
+                energy_per_atom = energy / atom_no
+
+                elist.append([i, energy, energy_per_atom, atom_no])
+
+                # add this energy to dictionary with the current dir as label
+        if elist:
+            energies[i] = elist
+
+
+
+    # output info to a csv.
+
+
+    # write information at top
+    path = os.getcwd() + '/' + 'geomopt_details.csv'
+    lines = ['\n' + '#' * 70 + "\n", "This file shows the geometry optimisation convergence details for files checked in this directory.",
+             "file was written (data recorded) on: " + datetime.datetime.now().strftime("%Y-%m-%d") + " at: " + datetime.datetime.now().time().strftime("%H:%M:%S"), "\n"]  # make lines
+    open(path, 'a').write('\n'.join(lines))  # write list to file
+
+    # write to csv
+    e_tuples = energies.values()  # convert the dictionary into a list of tuples for sorting
+    e_tuples = sorted(e_tuples, key=lambda x: x[0][0][0])  # this sorts the tuples - they came from a dict
+
+
+    for i in range(len(e_tuples)):
+        e_tuples[i][0] = [e_tuples[i][0][0], e_tuples[i][0][1], e_tuples[i][0][2], 0, e_tuples[i][0][3]]
+        for j in range(len(e_tuples[i]) - 1):
+            try:
+                e_tuples[i][j+1] = [e_tuples[i][j+1][0], e_tuples[i][j+1][1], e_tuples[i][j+1][2],
+                                   e_tuples[i][j+1][2] - e_tuples[i][j][3], e_tuples[i][j+1][3]]
+            except TypeError as e:
+                pass
+
+
+    with open(path, 'a') as f:
+        w = csv.writer(f, delimiter=',', escapechar=' ', quoting=csv.QUOTE_NONE)
+        w.writerow([
+                       'file name | total energy (eV) | energy (eV) per atom | energy difference (eV) | number of atoms in POSCAR \n'])
+        for i in e_tuples:
+            w.writerow('\n')
+            w.writerow([i[0][0]])
+            for j in i:
+                w.writerow(j)
+
+
+    #write other important info in above sequence? e.g. is it a metal...
+
+
     return False
 
 
