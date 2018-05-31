@@ -287,6 +287,57 @@ def remove_fly_bodge(path):
     return False
 
 
+def read_outcar(filepath):
+    #returns the energy and atom number from an OUTCAR file
+
+    file = filepath + '/OUTCAR'
+
+    elist = []
+    message = ''
+    try:
+        lines = open(file).read().splitlines()  # read lines into elements in a list
+    except FileNotFoundError as e:
+        lines = ''
+        message = ['one of your subdirectories does not include an OUTCAR file', e]
+        pass
+    # iterate over the lines
+    for j in lines:
+        if 'y=' in j:
+            numbers_on_line = re.findall('\d+', j)
+            energy = -float(str(numbers_on_line[3]) + '.' + str(
+                numbers_on_line[4]))  # the third element of numbers is before decimal, fourth is after
+            # note that elements zero and one are energy when sigma_>0, the second element is 0 from text sigma->0
+
+            POSCAR_file = filepath + '/POSCAR'
+            atom_no = get_no_atoms(POSCAR_file)
+            energy_per_atom = energy / atom_no
+
+            elist.append([filepath, energy, energy_per_atom, atom_no])
+
+    return (elist, message)
+
+
+def outcar_errs_and_warnings(filepath):
+    #returns the energy and atom number from an OUTCAR file
+
+    file = filepath + '/OUTCAR'
+
+    erlist = []
+    message = ''
+    try:
+        lines = open(file).read().splitlines()  # read lines into elements in a list
+    except FileNotFoundError as e:
+        lines = ''
+        message = ['one of your subdirectories does not include an OUTCAR file', e]
+        pass
+
+    # iterate over the lines
+    for j in lines:
+        if 'error' in j:
+            erlist.append([filepath, j])
+        elif 'warning' in j:
+            erlist.append([filepath, j])
+    return (erlist, message)
 
 ##########################################################################################
 # tree stuff - put this into a class and change all calls to trees appropriately
@@ -764,6 +815,7 @@ class FindEnergies:
         self.e_tree = e_tree
         self.k_tree = k_tree
         self.energies_list = {}
+        self.errors_list = {}
 
 
     def parent_iterator(self):
@@ -771,122 +823,179 @@ class FindEnergies:
 
         """
         e_name = root(self.e_tree)
-        self.file_iterator(e_name, self.e_tree)
+        e_message1, e_message2 = self.file_iterator(e_name, self.e_tree)
         k_name = root(self.k_tree)
-        self.file_iterator(k_name, self.k_tree)
+        k_message1, k_message2 = self.file_iterator(k_name, self.k_tree)
 
-        return False
+        return (e_message1, e_message2, k_message1, k_message2)
 
     def file_iterator(self, parent_name, tree):
         """
 
         """
         self.energies_list[parent_name] = {}
+        self.errors_list[parent_name] = {}
+
         for b in branches(tree): #iterate over the directories listed in the tree
-            file = parent_name + '/' + root(b)[0] + '/' + 'OUTCAR'  # path to OUTCAR file
-            try:
-                lines = open(file).read().splitlines()  # read lines into elements in a list
-            except FileNotFoundError as e:
-                lines = ''
-                pass
-            # iterate over the lines
-            for i in lines:
-                if 'y=' in i:
-                    numbers_on_line = re.findall('\d+', i)
-                    energy = -float(str(numbers_on_line[3]) + '.' + str(numbers_on_line[4])) # the third element of numbers is before decimal, fourth is after
-                    #note that elements zero and one are energy when sigma_>0, the second element is 0 from text sigma->0
-                    POSCAR_file = parent_name + '/' + root(b)[0] + '/' + 'POSCAR'
-                    atom_no = get_no_atoms(POSCAR_file)
-                    energy_per_atom = energy / atom_no
-                    self.energies_list[parent_name][root(b)[0]] = [root(b)[1] ,energy,energy_per_atom, atom_no]
-                    # add this energy to dictionary with the current dir as label
+
+            elist, message1 = read_outcar(parent_name + '/' + root(b)[0])
+
+            errlist, message2 = outcar_errs_and_warnings(parent_name + '/' + root(b)[0])
+
+            # add these values to dictionarys with the current dir as label
+            if errlist:
+                self.errors_list[parent_name][root(b)[0]] = [[root(b)[1], i[0], i[1]] for i in errlist]
+            if elist:
+                self.energies_list[parent_name][root(b)[0]] = [[root(b)[1], i[1], i[2], i[3]] for i in elist]
 
             if root(b)[0] not in self.energies_list[parent_name]:
-                self.energies_list[parent_name][root(b)[0]] = [root(b)[1], "'y=' wasn't found in the OUTCAR file", "not found", "N/A"]
-        return False
+                self.energies_list[parent_name][root(b)[0]] = [[root(b)[1], "'y=' wasn't found in the OUTCAR file", "not found", "N/A"]]
+            if root(b)[0] not in self.errors_list[parent_name]:
+                self.errors_list[parent_name][root(b)[0]] = [[root(b)[1], "no errors or warnings found", "not found", "N/A"]]
+
+        return (message1, message2)
 
 class WriteCSVFile:
     """
 
     """
 
-    def __init__(self, energies_object, foldername, filename, settings):
+    def __init__(self, energies_object = '', foldername = '', filename = '', settings = ''):
         """
 
         """
-
-        self.energies = energies_object.energies_list
+        if energies_object:
+            self.energies = energies_object.energies_list
+            self.errors = energies_object.errors_list
+            self.e_name = root(energies_object.e_tree)
+            self.k_name = root(energies_object.k_tree)
         self.filename = filename+'.csv'
         self.foldername = foldername
         self.settings = settings
-        self.e_name = root(energies_object.e_tree)
-        self.k_name = root(energies_object.k_tree)
         self.accessed = datetime.datetime.now().strftime("%Y-%m-%d")
         self.cwd = os.getcwd()  # of the script!
         self.time = datetime.datetime.now().time().strftime("%H:%M:%S")
 
-    def write(self):
-        """
 
-        """
+    def writer(self, path, lines):
+
+        open(path, 'a').write('\n'.join(lines))  # write list to file
+        return False
+
+
+    def gen_write(self, energies_lst, summary_type, preface = '', default_val = '', error_lst = ''):
 
         path = self.cwd + '/' + self.foldername + '/' + self.filename
+
+
+        # write information at top
+        lines = ['\n' + '#' * 70 + "\n", "This file shows the " + summary_type + " details for files checked in this folder.",
+                 "file was written (data recorded) on: " + self.accessed + " at: " + self.time, "\n"]  # make lines
+        self.writer(path, lines)  # write list to file
+
+
+        # title for ecuts, default kpts used
+        if preface:
+            if 'energy' in preface:
+                default_type = 'kpts'
+            elif 'k' in preface:
+                default_type = 'energy'
+            else:
+                default_type = 'unknown default type'
+
+            lines = ["convergence details for " + preface + " testing follows",
+                 "note the default " + default_type +  " used was: " + str(default_val), ""]  # make lines
+            self.writer(path, lines)  # write list to file
+        else:
+            default_type = ''
+
+
+        #write energies to csv
+        e_tuples = energies_lst
+
+        for i in range(len(e_tuples)):
+            e_tuples[i][0] = [e_tuples[i][0][0], e_tuples[i][0][1], e_tuples[i][0][2], 0, e_tuples[i][0][3]]
+            for j in range(len(e_tuples[i]) - 1):
+                try:
+                    e_tuples[i][j + 1] = [e_tuples[i][j + 1][0], e_tuples[i][j + 1][1], e_tuples[i][j + 1][2],
+                                          e_tuples[i][j + 1][2] - e_tuples[i][j][3], e_tuples[i][j + 1][3]]
+                except TypeError as e:
+                    pass
+
+        title_string = 'file name | total energy (eV) | energy (eV) per atom | energy difference (eV) | number of atoms in POSCAR \n'
+        if default_type == 'kpts':
+            title_string = 'cutoff energy | K-points used |' + title_string
+        elif default_type == 'energy':
+            title_string = 'kpoints | energy used |' + title_string
+
+        with open(path, 'a') as f:
+            w = csv.writer(f, delimiter=',', escapechar=' ', quoting=csv.QUOTE_NONE)
+            w.writerow([title_string])
+            for i in e_tuples:
+                if len(i) > 1:
+                    w.writerow([i[0][0]])
+                for j in i:
+                    w.writerow(j)
+                if len(i) > 1:
+                    w.writerow('\n')
+
+        #error information appended to file!
+        title_string = 'file path | error message  \n'
+        if default_type == 'kpts':
+            title_string = 'cutoff energy | K-points used | ' + title_string
+        elif default_type == 'energy':
+            title_string = 'kpoints | energy used | ' + title_string
+
+        with open(path, 'a') as f:
+            w = csv.writer(f, delimiter=',', escapechar=' ', quoting=csv.QUOTE_NONE)
+            w.writerow('\n')
+            w.writerow([title_string])
+            for i in error_lst:
+                if len(i) > 1:
+                    w.writerow([i[0][0]])
+                for j in i:
+                    w.writerow(j)
+                if len(i) > 1:
+                    w.writerow('\n')
+
+        return False
+
+
+
+
+    def tree_write(self):
+
         e_def = self.settings.def_e
         k_def = self.settings.def_k
-
-
-        #write information at top
-        lines = ['\n'+'#'*70 +"\n", "This file shows the convergence details for files checked in this folder.", "file was written (data recorded) on: "+ self.accessed + " at: " + self.time, "\n"]  # make lines
-        open(path, 'a').write('\n'.join(lines))  # write list to file
-
-
-        #title for ecuts, default kpts used
-        lines = ["convergence details for cutoff energy testing follows", "note the default kpts used were: " + str(k_def), ""]  # make lines
-        open(path, 'a').write('\n'.join(lines))  # write list to file
-
 
 
         #write ecuts to csv
         e_tuples = [(i, j) for i, j in self.energies[self.e_name].items()] # convert the dictionary into a list of tuples for sorting
         e_tuples = sorted(e_tuples, key = lambda x: int(x[0])) # this sorts the tuples - they came from a dict
-        e_tuples[0] = (e_tuples[0][0], e_tuples[0][1][0],e_tuples[0][1][1],e_tuples[0][1][2], 0,e_tuples[0][1][3])
-        for i in range(len(e_tuples)-1):
-            try:
-                e_tuples[i+1] = (e_tuples[i+1][0], e_tuples[i+1][1][0], e_tuples[i+1][1][1], e_tuples[i+1][1][2], e_tuples[i+1][1][2] - e_tuples[i][3], e_tuples[i+1][1][3])
-            except TypeError as e:
-                pass
+        e_tuples = [[[i[0], j[0], j[1], j[2], j[3]] for j in i[1]] for i in e_tuples]
 
-        with open(path, 'a') as f:
-            w = csv.writer(f, delimiter=',', escapechar=' ', quoting = csv.QUOTE_NONE)
-            w.writerow(['cutoff energy | K-points used | total energy (eV) |energy (eV) per atom | difference (eV) | number of atoms in POSCAR \n'])
-            for row in e_tuples:
-                w.writerow(row)
+        e_errors = [(i, j) for i, j in self.errors[self.e_name].items()]
+        e_errors = sorted(e_errors, key = lambda x: int(x[0]))  # sort them by the cutoff energy
+        e_errors = [[[i[0], j[0], j[1], j[2]] for j in i[1]] for i in e_errors]
 
-
-        # title for kpts, default ecuts used
-        lines = ["","convergence details for kpts testing follows", "note the default energy used was: " + e_def +" ev",
-                 ""]  # make lines
-        open(path, 'a').write('\n'.join(lines))  # write list to file
+        self.gen_write(e_tuples, 'convergence testing', 'energy testing', k_def, e_errors)
 
 
         # write kpts to csv
-        k_tuples = [(i.split('-'), j) for i, j in self.energies[self.k_name].items()]
-        k_tuples = sorted(k_tuples, key=lambda x: (int(x[0][0]), int(x[0][1]), int(x[0][2]))) # sort them by the kpoints
-        k_tuples[0] = ('-'.join(k_tuples[0][0]), k_tuples[0][1][0], k_tuples[0][1][1], k_tuples[0][1][2], 0,k_tuples[0][1][3])
-        for i in range(len(k_tuples)-1):
-            try:
-                k_tuples[i+1] = ('-'.join(k_tuples[i+1][0]), k_tuples[i+1][1][0],k_tuples[i+1][1][1], k_tuples[i+1][1][2], k_tuples[i+1][1][2] - k_tuples[i][3], k_tuples[i+1][1][3])
-            except TypeError as e:
-                pass
-        with open(path, 'a') as f:
-            w = csv.writer(f, delimiter=',', escapechar=' ', quoting=csv.QUOTE_NONE)
-            w.writerow(['kpoints | energy used | total energy (eV) | energy (eV) per atom | difference (eV) | number of atoms in POSCAR \n'])
-            for row in k_tuples:
-                w.writerow(row)
+        k_tuples = [(i, j) for i, j in self.energies[self.k_name].items()]
+        k_tuples = sorted(k_tuples, key=lambda x: (int(x[0].split('-')[0]), int(x[0].split('-')[1]), int(x[0].split('-')[2]))) # sort them by the kpoints
+        k_tuples = [[[i[0], j[0], j[1], j[2], j[3]] for j in i[1]] for i in k_tuples]
 
+        k_errors = [(i, j) for i, j in self.errors[self.k_name].items()]
+        k_errors = sorted(k_errors, key=lambda x: (int(x[0].split('-')[0]), int(x[0].split('-')[1]), int(x[0].split('-')[2])))  # sort them by the kpoints
+        k_errors = [[[i[0], j[0], j[1], j[2]] for j in i[1]] for i in k_errors]
+
+        self.gen_write(k_tuples, 'convergence testing', 'kpts testing', e_def, k_errors)
 
 
         return False
+
+
 
     def add_POSCAR(self):
         """
@@ -896,9 +1005,9 @@ class WriteCSVFile:
         a = [subprocess.Popen("cp INPUT/POSCAR " + str(self.foldername), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)]
         a = [i.communicate() for i in a]
 
-
-
         return False
+
+
 
 
 ##########################################################################################
@@ -909,7 +1018,7 @@ class log_file:
 
     """
 
-    def __init__(self, settings, filemaker, title = 'log_file'):
+    def __init__(self, settings = '', filemaker = '', title = '', messages = ''):
         """
 
         """
@@ -918,25 +1027,50 @@ class log_file:
         self.time = datetime.datetime.now().time().strftime("%H:%M:%S")
         self.cwd = os.getcwd() # of the script!
         self.settings = settings
-        self.def_e = settings.def_e
-        self.def_k = settings.def_k
-        self.trees = [settings.e_tree, settings.k_tree]
-        self.made_dirs = filemaker.made_parents
-        self.added_files = filemaker.added_files
-        self.edited_files = filemaker.edit_files
-        self.title = title
+        if self.settings:
+            self.def_e = settings.def_e
+            self.def_k = settings.def_k
+            self.trees = [settings.e_tree, settings.k_tree]
+        if filemaker:
+            self.made_dirs = filemaker.made_parents
+            self.added_files = filemaker.added_files
+            self.edited_files = filemaker.edit_files
+        self.title = title + 'log_file'
+        self.script_messages = {}
+        if messages:
+            self.script_messages = messages
 
 
     def create_log(self):
         """
 
         """
-
         path = self.cwd + '/' + self.title
-        lines = ["Date: " + self.date, "Time: " + self.time, "Working Directory: " + self.cwd, "default E: " + str(self.def_e), "default Kpts: " + str(self.def_k) ,"","file trees: ", str(self.trees),
-                 "","NOTE: the format of these logs is not great, if there are no obvious messages then everything is okay","","logs from making directories: ", str(self.made_dirs), "","logs from adding files: ", str(self.added_files), "",
-                 "logs from editing files: ", str(self.edited_files)]  # make lines
-        open(path, 'w').write('\n'.join(lines))  # write list to file
+
+        lines = ["Date: " + self.date, "Time: " + self.time, "Working Directory: " + self.cwd]
+        if 'convergence' in self.title:
+            lines += ["default E: " + str(self.def_e), "default Kpts: " + str(self.def_k) ,"","file trees: ", str(self.trees)]
+        elif 'geom' in self.title:
+            lines += [] # add info to geom opt log
+        elif 'making' in self.title:
+            lines += ["default E: " + str(self.def_e), "default Kpts: " + str(self.def_k), "", "file trees: ",
+            str(self.trees),
+            "", "logs from making directories: ", str(self.made_dirs), "", "logs from adding files: ",
+            str(self.added_files), "",
+            "logs from editing files: ", str(self.edited_files)]
+
+        lines += ["","NOTE: the format of these logs is not great, not all errors are logged" + '\n' + 'errors encountered:'+'\n']
+        if any(self.script_messages.values()):
+            messages = [(i, j) for i,j in self.script_messages.items() if j]
+            messages = ['\n'.join(['::: '.join([i[0],'; '.join([str(j) for j in i[1]])]) for i in messages])]
+            lines += messages
+
+
+        open(path, 'a').write('\n'*2)
+        open(path, 'a').write(14*'#' + '\n')
+        open(path, 'a').write('\n'.join(lines))  # write list to file
+
+        return False
 
 
 ##########################################################################################
@@ -965,7 +1099,7 @@ def make_conv_files():
 
     files.file_editor() # edit the files as needed
 
-    log = log_file(choices, files) # create log file
+    log = log_file(choices, files, 'making_dirs') # create log file
     log.create_log()
 
 
@@ -974,7 +1108,6 @@ def analyse_conv_files():
     """
 
     """
-
     a = subprocess.Popen(['mkdir', 'convergence_details'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # makes a folder to put the convergence details in
     files = FindFileStructure()
     files.get_file_structure() # this sets objects values to the cutoff energies, kpts tested and the defaults that were used.
@@ -982,114 +1115,66 @@ def analyse_conv_files():
 
     choices = Settings(files.e_sub, files.k_sub, files.def_E, files.def_k) # create settings object with the run conv testing settings
 
-
-    file_trees = choices.make_file_tree(files.parent_dirs['e'], files.parent_dirs['k']) # list with first element as e_tree and second element as k_tree
-
+    choices.make_file_tree(files.parent_dirs['e'], files.parent_dirs['k']) # list with first element as e_tree and second element as k_tree
 
     find_energies = FindEnergies(choices.e_tree, choices.k_tree)
-    find_energies.parent_iterator()
+    e_message1, e_message2, k_message1, k_message2 = find_energies.parent_iterator()
 
-    energy_dict = find_energies.energies_list # this returns a dictionary with two keys, E and K (or their names as directories found already)
-    #print(energy_dict)
-
-
-    #scale the energy by the number of atoms in the cell
-    #no_atoms = get_no_atoms()
-    #print(no_atoms)
-    #for i in energy_dict:
-     #   for j in energy_dict[i]:
-    #        try:
-     #           energy_dict[i][j][1] = energy_dict[i][j][1]/no_atoms
-      #      except TypeError as e:
-       #         pass
-    #print(energy_dict)
-    # the values of these are dictionaries with keys as the names of the folders and values as the energy in the OUTCAR
-
-    # you should edit that class to also save other important details from runs
+    find_energies.energies_list # this returns a dictionary with two keys, E and K (or their names as directories found already)
 
     written = WriteCSVFile(find_energies, 'convergence_details', 'convergence data', choices)
-    written.write() # writes all the convergence details analysed into a csv file.
+    written.tree_write() # writes all the convergence details analysed into a csv file.
     # this has details and list of energies and energy differences by sorted values
     written.add_POSCAR() # copies the poscar from input into this folder
 
 
-def analyse_geom_files():
+    script_messages = {}
+    script_messages['energy_conv energy retrieval'] = e_message1
+    script_messages['energy_conv error retrieval'] = e_message2
+    script_messages['kpt_conv energy retrieval'] = k_message1
+    script_messages['kpt_conv error retrieval'] = k_message2
 
-    #Do something similar to analysing convergence files but do it for geom optimisation
+    log = log_file(choices, '', 'convergence_testing', script_messages) # create log file
+    log.create_log()
+
+
+
+def analyse_geom_files():
 
     # assume that all files are 1 level deep in here
     ls = next(os.walk('.'))[1]# returns a list of directories only
-
     energies = {}
+    errors = {}
 
     # iterate through them all and analyse the OUTCAR in each folder
-
-    #fix this so it works for many E's! at the moment you overwrite them all!
     for i in ls:
-        elist = []
-        file = i + '/' + 'OUTCAR'  # path to OUTCAR file
-        try:
-            lines = open(file).read().splitlines()  # read lines into elements in a list
-        except FileNotFoundError as e:
-            lines = ''
-            print('one of your subdirectories does not include an OUTCAR file')
-            pass
-        # iterate over the lines
-        for j in lines:
-            if 'y=' in j:
-                numbers_on_line = re.findall('\d+', j)
-                energy = -float(str(numbers_on_line[3]) + '.' + str(
-                    numbers_on_line[4]))  # the third element of numbers is before decimal, fourth is after
-                # note that elements zero and one are energy when sigma_>0, the second element is 0 from text sigma->0
-                POSCAR_file = i + '/' + 'POSCAR'
-                atom_no = get_no_atoms(POSCAR_file)
-                energy_per_atom = energy / atom_no
-
-                elist.append([i, energy, energy_per_atom, atom_no])
-
-                # add this energy to dictionary with the current dir as label
+        elist, message1 = read_outcar(i)
+        errlist, message2 = outcar_errs_and_warnings(i)
+        # add this energy to dictionary with the current dir as label
         if elist:
             energies[i] = elist
+        if errlist:
+            errors[i] = errlist
 
 
 
     # output info to a csv.
-
-
-    # write information at top
-    path = os.getcwd() + '/' + 'geomopt_details.csv'
-    lines = ['\n' + '#' * 70 + "\n", "This file shows the geometry optimisation convergence details for files checked in this directory.",
-             "file was written (data recorded) on: " + datetime.datetime.now().strftime("%Y-%m-%d") + " at: " + datetime.datetime.now().time().strftime("%H:%M:%S"), "\n"]  # make lines
-    open(path, 'a').write('\n'.join(lines))  # write list to file
-
-    # write to csv
+    written = WriteCSVFile('','','geomopt_details')
     e_tuples = energies.values()  # convert the dictionary into a list of tuples for sorting
     e_tuples = sorted(e_tuples, key=lambda x: x[0][0][0])  # this sorts the tuples - they came from a dict
 
-
-    for i in range(len(e_tuples)):
-        e_tuples[i][0] = [e_tuples[i][0][0], e_tuples[i][0][1], e_tuples[i][0][2], 0, e_tuples[i][0][3]]
-        for j in range(len(e_tuples[i]) - 1):
-            try:
-                e_tuples[i][j+1] = [e_tuples[i][j+1][0], e_tuples[i][j+1][1], e_tuples[i][j+1][2],
-                                   e_tuples[i][j+1][2] - e_tuples[i][j][3], e_tuples[i][j+1][3]]
-            except TypeError as e:
-                pass
-
-
-    with open(path, 'a') as f:
-        w = csv.writer(f, delimiter=',', escapechar=' ', quoting=csv.QUOTE_NONE)
-        w.writerow([
-                       'file name | total energy (eV) | energy (eV) per atom | energy difference (eV) | number of atoms in POSCAR \n'])
-        for i in e_tuples:
-            w.writerow('\n')
-            w.writerow([i[0][0]])
-            for j in i:
-                w.writerow(j)
-
+    errors = errors.values()
+    errors = sorted(errors, key=lambda x: x[0][0][0])
+    written.gen_write(e_tuples, 'geometry optimisation','','', errors)
 
     #write other important info in above sequence? e.g. is it a metal...
+    script_messages = {}
+    script_messages['energy retrieval'] = message1
+    script_messages['error retrieval'] = message2
 
+
+    log = log_file('','','geometry_optimisation', script_messages) # create log file
+    log.create_log()
 
     return False
 
