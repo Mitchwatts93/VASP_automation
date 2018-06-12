@@ -4,6 +4,8 @@ from pymatgen.core.structure import Structure
 from pymatgen.io.vasp import Poscar
 from pymatgen.core.sites import PeriodicSite
 from pymatgen.core.periodic_table import Element
+from pymatgen.analysis.ewald import EwaldSummation
+from pymatgen.analysis.local_env import CrystalNN
 import operator
 import numpy as np
 import macrodensity as md
@@ -17,8 +19,6 @@ import scipy.spatial.distance as spd
 ########################################################################################################################
 # Author: Mitch Watts
 # Date: 4-6-18
-# References: some aspects of this code draw from the public github package 'twod_materials' intercalation code,
-#             by author Michael Ashton (ashtonmv)
 ########################################################################################################################
 
 
@@ -30,12 +30,12 @@ import scipy.spatial.distance as spd
 # remove any sites with wildly different potentials??
 # remove any sites too close to the edges?
 
-# add Ewald sum functionality
-# sort by Ewald summation and remove any with wildly different values
+# remove any structures with low potential sm
 
 # tidy up
 # docstrings
-# add potential of setup to info when structure is produced
+# add variance to the dictionary for each structure produced
+# write energy info to a file
 # add user inputs/argparse so can select density of intercalant and the species, as well as filenames
 ########################################################################################################################
 
@@ -43,7 +43,7 @@ class Intercalate(object):
 
 
     def __init__(self, intercalant_type, intercalant_density, poscar_path = '', locpot_path = '', layered = True, only_sym_dist = False, coord_file_type = 'poscar', output_filepath = '',
-                 output_filename = 'POSCAR_intercalated' , sens_fact = 0.97, vac_thresh = 6, default_vac = 3, voronoi_prox_crit = 1.5, voronoi_rad_cutoff_ratio = 0.3):
+                 output_filename = 'POSCAR_intercalated' , sens_fact = 0.97, vac_thresh = 6, default_vac = 3, voronoi_prox_crit = 1.3, voronoi_rad_cutoff_ratio = 0.3):
         self.int_atom = intercalant_type
         self.int_dens = intercalant_density
         self.layered = layered
@@ -137,12 +137,16 @@ class Intercalate(object):
         self.remove_surface_atoms() # get rid of any that aren't intercalated, and are just on the surfaces
         print('\n')
 
+        print('removing and voronoi sites which are within layers of the structure')
+        self.remove_intralayer_atoms(self.structure, self.interstitial_sites)  # get rid of any that aren't intercalated, and are just on the surfaces
+        print('\n')
+
+
         # remove any sites within layers here
 
         # remove any sites with wildly different potentials??
 
         # remove any sites too close to the edges?
-
 
 
         print('sorting sites by potential/by voronoi radius')
@@ -154,7 +158,7 @@ class Intercalate(object):
         print("adding the sites and all possible combinations of these sites to the structures")
         self.find_all_combos() # find all combinations of the interstitials found so far
         len_before_removal = len(self.structure_list) # how many elements before you remove th eoverlapping ones?
-        self.remove_sites_too_close() # remove the overlapping points
+        self.remove_sites_too_close() # remove the overlapping points and points to close to structure atoms
         self.structs_removed = len_before_removal - len(self.structure_list)  # how many were removed
 
         # this needs to be redone to choose similar energy combinations of sites, rather than individual sites!
@@ -163,13 +167,17 @@ class Intercalate(object):
         # note you should only do this if we have the potentials!!!!
         #self.equivalent_interstitials()  # finds equivalent points based on their potentials
         #print('\n')
-        self.calc_no_combos()
+        self.calc_no_combos() # get the number of combinations
 
-        self.add_interstitials() # adds the lowest energy sites to structure.
-        # any potentials within e.g. 0.98 i.e. 98% of the maximum are included, and variations of all these structures are produced
+        self.sort_sites_by_pot_sum() #sort the found interstitial combos by their potential sum, largest to smallest
+
+        self.add_interstitials() # adds the sites to structure, most energetically favourable first
         # the final structures are called: self.intercalated_structs
 
         # sort by Ewald summation here and remove any with widly different values
+        # note: self.intercalated_structs elements 0 are dictionaries containing energies etc.  'sum_of_pots_from_locpot' for sum of pot energy for structure
+
+        self.ewald_sorter() # this will add the ewald sum energy for this configuration to the dictionary in position 1 in each list under 'Ewald_energy' key
 
         self.report_expected_sites() # tell the user how many structures were made
         print('\n')
@@ -230,19 +238,58 @@ class Intercalate(object):
             print('using Ewald summation method as LOCPOT file has not been read correctly')
             return self.ewald_summation(self.structure)
 
+    def sort_sites_by_pot_sum(self):
+
+        # get the sum for each config
+        for i in range(len(self.structure_list)):
+            pot_sum = 0
+            for j in self.structure_list[i]:
+                pot_sum += j[2]
+            self.structure_list[i].insert(0, {'sum_of_pots_from_locpot':pot_sum}) # insert it to the 0th element of the list of sites for that config
+
+        # then sort by potential
+        self.structure_list.sort(key = lambda k: k[0]['sum_of_pots_from_locpot'])
+        self.structure_list.reverse()
+
+
 
     def ewald_summation(self, structure):
-        print('Working on Ewald summation to sort sites. Not implimented yet so sites are sorted just by Voronoi radii')
+        ewald_energy = EwaldSummation(structure).total_energy
+        return ewald_energy
 
 
+    def oxidation_decorate(self, structure, oxidation_states):
+        # decorates with charges to make suitable for ewald summation by changing oxidation states
+        structure.add_oxidation_state_by_element(oxidation_states)
+        return structure
+
+    def ewald_all_structs(self):
+        #self.intercalated_structs #this is the list of structures at index 0, dictionary at 1
+        for i in range(len(self.intercalated_structs)):
+            # self.intercalated_structs[i][0] is the structure.
+            struct_to_sum = self.intercalated_structs[i][0].copy()
+            frac_charge = - self.no_ions / (struct_to_sum.num_sites)
+            oxidation_states = {self.int_atom : 1, str(struct_to_sum.species[0]):frac_charge} #this assumes the structure you're adding is monoelemental
+            struct_to_sum = self.oxidation_decorate(struct_to_sum, oxidation_states)
+            ewald_energy = self.ewald_summation(struct_to_sum)
+            self.intercalated_structs[i][1]['Ewald_energy'] = ewald_energy # put this energy into the dictionary for safe-keeping
+
+
+    def ewald_sorter(self):
+        self.ewald_all_structs() #add an ewald energy to the dictionary for each structure
+        #now sort by this ewald sum
+        self.intercalated_structs.sort(key=lambda k: k[1]['Ewald_energy']) #sort in ascending order
+        self.intercalated_structs.reverse() #reverse so highest first
+
+
+    ## this is no longer used, might be revived so keeping here for now
     def equivalent_interstitials(self):
 
         self.equivalent_interstitials_lst = []
-        print(self.interstitial_sites)
         for i in self.interstitial_sites:
-            print(i)
             if i[2] >= self.interstitial_sites[0][2] * self.sens_factor:
                 self.equivalent_interstitials_lst.append(i)
+
 
 
     def calc_no_combos(self):
@@ -271,10 +318,19 @@ class Intercalate(object):
                         site_combo_lst.append(site_list[i] + c)
             return site_combo_lst
 
-        structure_list = ion_combos([[i[0]] for i in self.interstitial_sites], self.no_ions)
-
+        structure_list = ion_combos([[i] for i in self.interstitial_sites], self.no_ions)
         self.structure_list = structure_list
-        return structure_list
+
+    def remove_sites_helper(self, sites1, sites2):
+
+        # remove ions too close together
+        dist_mat = spd.cdist(sites1, sites2,
+                             'euclidean')  # euclidean distances between all coodinate points. diagonals are zeros
+        elements_too_close = dist_mat[np.where(
+            dist_mat < self.voronoi_prox_crit)]  # create a matrix of values which are below the threshold closeness
+        return elements_too_close
+
+
 
     def remove_sites_too_close(self):
         a = self.structure.lattice.a
@@ -284,22 +340,30 @@ class Intercalate(object):
 
         # remove overlapping combinations here!
         for i in range(len(self.structure_list)):
-            sites = [[j[k] * lat_vecs[k] for k in range(3)] for j in
+            sites = [[j[0][k] * lat_vecs[k] for k in range(3)] for j in
                      self.structure_list[i]]  # convert from fractional into cartesian
 
-            dist_mat = spd.cdist(sites, sites,
-                                 'euclidean')  # euclidean distances between all coodinate points. diagonals are zeros
-            elements_too_close = dist_mat[np.where(
-                dist_mat < self.voronoi_prox_crit)]  # create a matrix of values which are below the threshold closeness
+            elements_too_close = self.remove_sites_helper(sites, sites)
             elements_too_close = elements_too_close[np.where(
-                elements_too_close > 0)]  # if any of these aren't diagonals (where d = 0) which correspond to distance to themselves. then keep them in this matrix
+                elements_too_close > 0)]  # if any of these aren't diagonals (where d = 0)
+                 # which correspond to distance to themselves. then keep them in this matrix
 
             if elements_too_close.any():
                 self.structure_list[i] = 'delete'  # mark for deletion
 
+            # do same again for ion - structure sites
+            lattice_sites = []
+            for site in self.structure._sites:
+                lattice_sites.append(site._coords)
+            elements_too_close = self.remove_sites_helper(sites, lattice_sites)
+            if elements_too_close.any():
+                self.structure_list[i] = 'delete'  # mark for deletion
+
+
         self.structure_list = [i for i in self.structure_list if i != 'delete']  # remove elements marked for deletion
 
 
+    ### here is where you're turning one structure into 3!!
     def add_interstitials(self):
         # iterate through combinations and add them to pymatgen structures, so we end up with a list of all structures with combinations of sites
         #could put this in an external function to keep it tidy
@@ -307,9 +371,12 @@ class Intercalate(object):
         for i in self.structure_list:
             new_struct = self.structure.copy()
             for j in i:
-                new_struct.append(self.int_atom, j)
-            final_structs.append(new_struct)
+                if type(j) is list:
+                    new_struct.append(self.int_atom, j[0])
+            final_structs.append([new_struct, i[0]]) # now the details of the site are included next to each structure
         self.intercalated_structs = final_structs
+
+
 
 
     def report_expected_sites(self):
@@ -338,7 +405,7 @@ class Intercalate(object):
 
         for i in range(len(self.intercalated_structs)):
             filepath = self.output_filepath + 'intercalated_structures/' + self.output_filename + '_structure_no_' + str(i) + '.vasp'
-            self.intercalated_structs[i].to(self.coord_file_type, filepath)
+            self.intercalated_structs[i][0].to(self.coord_file_type, filepath)
 
 
     def find_vacuums(self):
@@ -404,6 +471,7 @@ class Intercalate(object):
         self.interstitial_sites = [i for i in self.interstitial_sites if len(i[0]) == 3] # the above list conc doesn't delete sites, just coordinates, so here delete any sites which have had any coordinates removed
 
 
+
     def remove_sites_near_edges(self):
         a = self.structure.lattice.a
         b = self.structure.lattice.b
@@ -413,13 +481,48 @@ class Intercalate(object):
 
 
 
-    def remove_sites_within_layers(self):
+
+    ####
+    def remove_intralayer_atoms(self, structure, interstitial_sites):
+        #################################################################
+        #################################################################
+        #layers_dict = self.find_layers(structure)
+        crystalnn = CrystalNN()
+        bonded = crystalnn.get_bonded_structure(structure)
+        print(bonded)
+
         return
 
-    def find_layers(self):
+    def find_layers(self, structure):
         # return coordinates of all points in layer, plus bounding limits in each axis
-        return
+        i = 1
+        layers_dict = {}
+        sites_list = structure.copy()
+        while i:
+            if any(sites_list): #if there are atoms left in the structure
+                # pick a site and then find all atoms bonded to it
+                seed_site = sites_list[0]
+                print(seed_site)
+                layer_list, sites_list = self.atom_connectivity(sites_list, seed_site)
+                # put all the atom coordinates in layer_list
+                # then add this to the dictionary
+                dict_str = "layer_" + str(i)
+                layers_dict[dict_str] = layer_list
+                #delete these sites from new_struct
+                i += 1
+            else: #of no atoms left then you've found all the atoms
+                i=0 #set i = 0 and get out of while loop
+        return layers_dict
 
+
+    def atom_connectivity(self, structure, site):
+        layer_list = []
+        print(site._species)
+        print(site._coords)
+        print(structure[site])
+
+        return layer_list, structure
+    #####
 
     def check_orthog_lat(self):
         alpha = int(self.structure.lattice.alpha)
@@ -483,4 +586,4 @@ def spherical_potential(grid_pot, sphere_rad, origin, NGX, NGY, NGZ):
 
 
 
-intercalated = Intercalate('Li', 0.2)
+intercalated = Intercalate('Li', 0.25)
